@@ -14,12 +14,12 @@
 namespace Botan {
 
 /**
-* SHAKE-128 XOF presented as a stream cipher
+* Base class for SHAKE-based XOFs presented as a stream cipher
 */
-class SHAKE_128_Cipher final : public StreamCipher
+class SHAKE_Cipher : public StreamCipher
    {
    public:
-      SHAKE_128_Cipher();
+      explicit SHAKE_Cipher(size_t shake_rate);
 
       /**
       * Produce more XOF output
@@ -36,18 +36,45 @@ class SHAKE_128_Cipher final : public StreamCipher
       */
       void set_iv(const uint8_t iv[], size_t iv_len) override;
 
-      Key_Length_Specification key_spec() const override;
-
       void clear() override;
-      std::string name() const override;
-      std::unique_ptr<StreamCipher> new_object() const override;
 
    private:
       void key_schedule(const uint8_t key[], size_t key_len) override;
 
+   protected:
+      size_t m_shake_rate;
+
       secure_vector<uint64_t> m_state; // internal state
       secure_vector<uint8_t> m_buffer; // ciphertext buffer
       size_t m_buf_pos; // position in m_buffer
+   };
+
+class SHAKE_128_Cipher : public SHAKE_Cipher
+   {
+   public:
+      SHAKE_128_Cipher();
+
+      std::string name() const override
+         { return "SHAKE-128"; }
+
+      std::unique_ptr<StreamCipher> new_object() const override
+         { return std::make_unique<SHAKE_128_Cipher>(); }
+
+      Key_Length_Specification key_spec() const override;
+   };
+
+class SHAKE_256_Cipher : public SHAKE_Cipher
+   {
+   public:
+      SHAKE_256_Cipher();
+
+      std::string name() const override
+         { return "SHAKE-256"; }
+
+      std::unique_ptr<StreamCipher> new_object() const override
+         { return std::make_unique<SHAKE_256_Cipher>(); }
+
+      Key_Length_Specification key_spec() const override;
    };
 
 }

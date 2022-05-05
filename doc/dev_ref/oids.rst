@@ -17,6 +17,25 @@ Values currently assigned are::
   kyber       OBJECT IDENTIFIER ::= { publicKey 7 }
   xmss        OBJECT IDENTIFIER ::= { publicKey 8 }
 
+  -- The current dilithium implementation is compatible with the reference
+  -- implementation commit 3e9b9f1412f6c7435dbeb4e10692ea58f181ee51
+  dilithium     OBJECT IDENTIFIER ::= { publicKey 9 }
+  dilithium-aes OBJECT IDENTIFIER ::= { publicKey 10 }
+
+  dilithium-4x4-randomized    OBJECT IDENTIFIER ::= { dilithium 1 }
+  dilithium-4x4-deterministic OBJECT IDENTIFIER ::= { dilithium 2 }
+  dilithium-6x5-randomized    OBJECT IDENTIFIER ::= { dilithium 3 }
+  dilithium-6x5-deterministic OBJECT IDENTIFIER ::= { dilithium 4 }
+  dilithium-8x7-randomized    OBJECT IDENTIFIER ::= { dilithium 5 }
+  dilithium-8x7-deterministic OBJECT IDENTIFIER ::= { dilithium 6 }
+
+  dilithium-aes-4x4-randomized    OBJECT IDENTIFIER ::= { dilithium-aes 1 }
+  dilithium-aes-4x4-deterministic OBJECT IDENTIFIER ::= { dilithium-aes 2 }
+  dilithium-aes-6x5-randomized    OBJECT IDENTIFIER ::= { dilithium-aes 3 }
+  dilithium-aes-6x5-deterministic OBJECT IDENTIFIER ::= { dilithium-aes 4 }
+  dilithium-aes-8x7-randomized    OBJECT IDENTIFIER ::= { dilithium-aes 5 }
+  dilithium-aes-8x7-deterministic OBJECT IDENTIFIER ::= { dilithium-aes 6 }
+
   symmetricKey OBJECT IDENTIFIER ::= { randombit 3 }
 
   ocbModes OBJECT IDENTIFIER ::= { symmetricKey 2 }
