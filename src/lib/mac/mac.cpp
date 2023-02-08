@@ -24,6 +24,12 @@
   #include <botan/hash.h>
 #endif
 
+#if defined(BOTAN_HAS_KMAC)
+  #include <botan/internal/kmac.h>
+  #include <botan/hash.h>
+#endif
+
+
 #if defined(BOTAN_HAS_POLY1305)
   #include <botan/internal/poly1305.h>
 #endif
@@ -113,6 +119,17 @@ MessageAuthenticationCode::create(const std::string& algo_spec,
       if(provider.empty() || provider == "base")
          {
          return std::make_unique<ANSI_X919_MAC>();
+         }
+      }
+#endif
+
+
+#if defined(BOTAN_HAS_KMAC)
+   if(req.algo_name() == "KMAC256")
+      {
+      if(provider.empty() || provider == "base")
+         {
+         return std::make_unique<KMAC256>();
          }
       }
 #endif

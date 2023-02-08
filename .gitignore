@@ -53,6 +53,10 @@ vgcore.*
 /TAGS
 /tags
 
+# cscope files
+cscope.out
+
+
 # Amalgamation code
 botan_all.h
 botan_all_internal.h

@@ -30,7 +30,7 @@ class KMAC256 final : public MessageAuthenticationCode
       /**
       * @param hash the hash to use for KMAC256ing
       */
-      explicit KMAC256(std::unique_ptr<HashFunction> hash);
+      explicit KMAC256();
 
       KMAC256(const KMAC256&) = delete;
       KMAC256& operator=(const KMAC256&) = delete;
@@ -40,6 +40,8 @@ class KMAC256 final : public MessageAuthenticationCode
       void key_schedule(const uint8_t[], size_t) override;
 
       size_t m_output_length;
+
+      std::unique_ptr<HashFunction> m_hash;
    };
 
 }
