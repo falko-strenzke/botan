@@ -5,45 +5,46 @@
 * Botan is released under the Simplified BSD License (see license.txt)
 */
 
+#include "botan/exceptn.h"
 #include <botan/mac.h>
 #include <botan/exceptn.h>
 #include <botan/internal/scan_name.h>
 #include <botan/mem_ops.h>
 
 #if defined(BOTAN_HAS_CMAC)
-  #include <botan/internal/cmac.h>
+   #include <botan/internal/cmac.h>
 #endif
 
 #if defined(BOTAN_HAS_GMAC)
-  #include <botan/internal/gmac.h>
-  #include <botan/block_cipher.h>
+   #include <botan/internal/gmac.h>
+   #include <botan/block_cipher.h>
 #endif
 
 #if defined(BOTAN_HAS_HMAC)
-  #include <botan/internal/hmac.h>
-  #include <botan/hash.h>
+   #include <botan/internal/hmac.h>
+   #include <botan/hash.h>
 #endif
 
 #if defined(BOTAN_HAS_KMAC)
-  #include <botan/internal/kmac.h>
-  #include <botan/hash.h>
+   #include <botan/internal/kmac.h>
+   #include <botan/hash.h>
 #endif
 
 
 #if defined(BOTAN_HAS_POLY1305)
-  #include <botan/internal/poly1305.h>
+   #include <botan/internal/poly1305.h>
 #endif
 
 #if defined(BOTAN_HAS_SIPHASH)
-  #include <botan/internal/siphash.h>
+   #include <botan/internal/siphash.h>
 #endif
 
 #if defined(BOTAN_HAS_ANSI_X919_MAC)
-  #include <botan/internal/x919_mac.h>
+   #include <botan/internal/x919_mac.h>
 #endif
 
 #if defined(BOTAN_HAS_BLAKE2BMAC)
-  #include <botan/internal/blake2bmac.h>
+   #include <botan/internal/blake2bmac.h>
 #endif
 
 namespace Botan {
@@ -67,7 +68,7 @@ MessageAuthenticationCode::create(const std::string& algo_spec,
       if(provider.empty() || provider == "base")
          {
          if(auto bc = BlockCipher::create(req.arg(0)))
-            return std::make_unique<GMAC>(std::move(bc));
+            { return std::make_unique<GMAC>(std::move(bc)); }
          }
       }
 #endif
@@ -78,7 +79,7 @@ MessageAuthenticationCode::create(const std::string& algo_spec,
       if(provider.empty() || provider == "base")
          {
          if(auto hash = HashFunction::create(req.arg(0)))
-            return std::make_unique<HMAC>(std::move(hash));
+            { return std::make_unique<HMAC>(std::move(hash)); }
          }
       }
 #endif
@@ -87,7 +88,7 @@ MessageAuthenticationCode::create(const std::string& algo_spec,
    if(req.algo_name() == "Poly1305" && req.arg_count() == 0)
       {
       if(provider.empty() || provider == "base")
-         return std::make_unique<Poly1305>();
+         { return std::make_unique<Poly1305>(); }
       }
 #endif
 
@@ -107,7 +108,7 @@ MessageAuthenticationCode::create(const std::string& algo_spec,
       if(provider.empty() || provider == "base")
          {
          if(auto bc = BlockCipher::create(req.arg(0)))
-            return std::make_unique<CMAC>(std::move(bc));
+            { return std::make_unique<CMAC>(std::move(bc)); }
          }
       }
 #endif
@@ -129,7 +130,11 @@ MessageAuthenticationCode::create(const std::string& algo_spec,
       {
       if(provider.empty() || provider == "base")
          {
-         return std::make_unique<KMAC256>();
+         if(req.arg_count() != 1)
+            {
+            throw Invalid_Argument("invalid algorithm specification for KMAC: need exactly one argument for output bit length");
+            }
+         return std::make_unique<KMAC256>(req.arg_as_integer(0));
          }
       }
 #endif
@@ -149,7 +154,7 @@ MessageAuthenticationCode::providers(const std::string& algo_spec)
 //static
 std::unique_ptr<MessageAuthenticationCode>
 MessageAuthenticationCode::create_or_throw(const std::string& algo,
-                                           const std::string& provider)
+      const std::string& provider)
    {
    if(auto mac = MessageAuthenticationCode::create(algo, provider))
       {
@@ -162,7 +167,7 @@ void MessageAuthenticationCode::start_msg(const uint8_t nonce[], size_t nonce_le
    {
    BOTAN_UNUSED(nonce);
    if(nonce_len > 0)
-      throw Invalid_IV_Length(name(), nonce_len);
+      { throw Invalid_IV_Length(name(), nonce_len); }
    }
 
 /*
@@ -173,7 +178,7 @@ bool MessageAuthenticationCode::verify_mac(const uint8_t mac[], size_t length)
    secure_vector<uint8_t> our_mac = final();
 
    if(our_mac.size() != length)
-      return false;
+      { return false; }
 
    return constant_time_compare(our_mac.data(), mac, length);
    }

@@ -6,7 +6,7 @@
 */
 
 #include <botan/internal/keccak.h>
-#include <botan/internal/sha3.h>
+#include <botan/internal/keccak_fips.h>
 #include <botan/exceptn.h>
 #include <botan/internal/loadstor.h>
 
@@ -49,12 +49,12 @@ void Keccak_1600::clear()
 
 void Keccak_1600::add_data(const uint8_t input[], size_t length)
    {
-   m_S_pos = SHA_3::absorb(m_bitrate, m_S, m_S_pos, input, length);
+   m_S_pos = Keccak_FIPS_generic::absorb(m_bitrate, m_S, m_S_pos, input, length);
    }
 
 void Keccak_1600::final_result(uint8_t output[])
    {
-   SHA_3::finish(m_bitrate, m_S, m_S_pos, 0x01, 0x80);
+   Keccak_FIPS_generic::finish(m_bitrate, m_S, m_S_pos, 0, 0);
 
    /*
    * We never have to run the permutation again because we only support

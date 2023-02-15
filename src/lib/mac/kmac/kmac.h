@@ -27,10 +27,11 @@ class KMAC256 final : public MessageAuthenticationCode
 
       Key_Length_Specification key_spec() const override;
 
+    void start_msg(const uint8_t nonce[], size_t nonce_len) override;
       /**
       * @param hash the hash to use for KMAC256ing
       */
-      explicit KMAC256();
+      explicit KMAC256(uint32_t output_byte_length);
 
       KMAC256(const KMAC256&) = delete;
       KMAC256& operator=(const KMAC256&) = delete;
@@ -39,9 +40,12 @@ class KMAC256 final : public MessageAuthenticationCode
       void final_result(uint8_t[]) override;
       void key_schedule(const uint8_t[], size_t) override;
 
-      size_t m_output_length;
+      size_t m_output_bit_length;
+      secure_vector<uint8_t> m_key;
+      bool m_key_set = false;
 
       std::unique_ptr<HashFunction> m_hash;
+      size_t m_pad_byte_length;
    };
 
 }
