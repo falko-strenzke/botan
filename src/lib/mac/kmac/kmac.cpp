@@ -9,7 +9,7 @@
 #include "botan/exceptn.h"
 #include "botan/assert.h"
 #include <botan/internal/kmac.h>
-#include <botan/internal/keccak.h>
+#include <botan/internal/keccak_fips.h>
 #include <botan/exceptn.h>
 #include <botan/secmem.h>
 #include <botan/types.h>
@@ -211,12 +211,12 @@ void KMAC256::start_msg(const uint8_t nonce[], size_t nonce_len)
 */
 KMAC256::KMAC256(uint32_t output_bit_length)
    :m_output_bit_length(output_bit_length),
-    m_hash(new Keccak_1600(m_output_bit_length)),
+    m_hash(new Keccak_FIPS_512(m_output_bit_length)),
     m_pad_byte_length(136)
    {
    if(!m_hash)
       {
-      throw Internal_Error("could not instantiate Keccak-1600 for KMAC256, this should not happen");
+      throw Internal_Error("could not instantiate Keccak_FIPS_512 for KMAC256, this should not happen");
       }
    // ensure valid output length
    byte_len_from_bit_len(m_output_bit_length);
