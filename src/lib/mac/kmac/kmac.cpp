@@ -14,11 +14,9 @@
 #include <botan/secmem.h>
 #include <botan/types.h>
 #include <limits>
+#include <string>
 #include <vector>
 
-//TODO: remove
-#include <iostream>
-#include <botan/hex.h>
 
 namespace Botan {
 
@@ -40,9 +38,10 @@ namespace Botan {
 namespace {
 
 template < bool IS_LEFT_ENCODE, typename T>
-void left_or_right_encode(size_t s, T& output_container)
+size_t left_or_right_encode(size_t s, T& output_container)
    {
    int i;
+   size_t bytes_appended = 0;
    // determine number of octets needed to encode s
    for(i = sizeof(s); i > 0; i--)
       {
@@ -56,58 +55,40 @@ void left_or_right_encode(size_t s, T& output_container)
    {
        i = 1;
    }
-   std::cout << "first loop: i = " << i << std::endl;
    if(IS_LEFT_ENCODE)
       {
       output_container.push_back(i);
+      bytes_appended++;
       }
    // big endian encoding of s
    for(int j = i; j > 0; j--)
       {
       output_container.push_back(s >> (j-1)*8 & (static_cast<size_t>(0xFF)  ));
+      bytes_appended++;
       }
    if(!IS_LEFT_ENCODE)
       {
       output_container.push_back(i);
+      bytes_appended++;
       }
+   return bytes_appended;
    }
 
 template <typename T>
-void left_encode(size_t s, T& output_container)
+size_t left_encode(size_t s, T& output_container)
    {
    return left_or_right_encode<true>(s, output_container);
    }
 
 template <typename T>
-void right_encode(size_t s, T& output_container)
+size_t right_encode(size_t s, T& output_container)
    {
-   return left_or_right_encode<false>(s, output_container);
-   }
-
-void test_left_encode()
-   {
-   std::vector<uint8_t> exp_res = {0x02, 0x01, 0x00};
-   std::vector<uint8_t> result;
-   left_encode(256, result);
-   if(exp_res != result)
-      {
-      //std::cerr << "error for left_encode: result = " << hex_encode(result) << std::endl;
-      throw Botan::Internal_Error("invalid self test result for left_encode: " + hex_encode(result));
-      }
+   size_t result = left_or_right_encode<false>(s, output_container);
+   return result;
    }
 
 
-void test_right_encode()
-   {
-   std::vector<uint8_t> exp_res = {0x00, 0x01};
-   std::vector<uint8_t> result;
-   right_encode(0, result);
-   if(exp_res != result)
-      {
-      std::cerr << "error for right_encode: result = " << hex_encode(result) << std::endl;
-      throw Botan::Internal_Error("invalid self test result for right_encode");
-      }
-   }
+
 
 size_t byte_len_from_bit_len(size_t bit_length)
    {
@@ -133,23 +114,21 @@ size_t bit_len_from_byte_len(size_t byte_length)
 template <typename T>
 void encode_string(const uint8_t* input, size_t input_byte_length, T& output_container)
    {
-   // TODO: REMOVE TESTS:
-   test_left_encode();
-   test_right_encode();
-   // END TESTS
    // left_encode(*bitlen* of input)
-   left_encode(bit_len_from_byte_len(input_byte_length), output_container);
+   size_t written = left_encode(bit_len_from_byte_len(input_byte_length), output_container);
    output_container.insert(output_container.end(), input, &input[input_byte_length]);
+   written += input_byte_length;
    }
 
 template <typename T>
 void byte_pad(uint8_t input[], size_t input_byte_length, size_t w_in_bytes, T& output_container)
    {
-   left_encode(w_in_bytes, output_container);
+   size_t written_bytes = left_encode(w_in_bytes, output_container);
    output_container.insert(output_container.end(), input, &input[input_byte_length]);
-   if(w_in_bytes > input_byte_length)
+   written_bytes += input_byte_length;
+   if(w_in_bytes > written_bytes)
       {
-      size_t nb_trail_zeroes = w_in_bytes - input_byte_length;
+      size_t nb_trail_zeroes = w_in_bytes - written_bytes;
       std::vector<uint8_t> trailing_zeroes(nb_trail_zeroes, 0);
       output_container.insert(output_container.end(), &trailing_zeroes[0], &trailing_zeroes[trailing_zeroes.size()]);
       }
@@ -162,11 +141,11 @@ void KMAC256::clear()
    {
    zap(m_key);
    m_key_set = false;
-   m_hash->clear();
+   m_hash.clear();
    }
 std::string KMAC256::name() const
    {
-   return std::string("KMAC-256");
+   return std::string("KMAC256(" + std::to_string(m_output_bit_length) + ")");
    }
 std::unique_ptr<MessageAuthenticationCode> KMAC256::new_object() const
    {
@@ -189,21 +168,18 @@ Key_Length_Specification KMAC256::key_spec() const
 void KMAC256::start_msg(const uint8_t nonce[], size_t nonce_len)
    {
    const uint8_t dom_sep [] = { 'K', 'M', 'A', 'C' };
-   if(!m_key_set)
-      {
-      throw Internal_Error("key not set for KMAC, this should not happen");
-      }
+   verify_key_set(m_key_set);
    std::vector<uint8_t> t_input;
    encode_string(dom_sep, sizeof(dom_sep), t_input);
    encode_string(nonce, nonce_len, t_input);
    std::vector<uint8_t> t;
-   byte_pad(&t[0], t.size(), m_pad_byte_length, t);
-   m_hash->update(t);
+   byte_pad(&t_input[0], t_input.size(), m_pad_byte_length, t);
+   m_hash.update(t);
    secure_vector<uint8_t> key_input;
    encode_string(&m_key[0], m_key.size(), key_input);
    secure_vector<uint8_t> newX_head;
    byte_pad(&key_input[0], key_input.size(), m_pad_byte_length, newX_head);
-   m_hash->update(newX_head);
+   m_hash.update(newX_head);
    }
 
 /**
@@ -211,30 +187,29 @@ void KMAC256::start_msg(const uint8_t nonce[], size_t nonce_len)
 */
 KMAC256::KMAC256(uint32_t output_bit_length)
    :m_output_bit_length(output_bit_length),
-    m_hash(new Keccak_FIPS_512(m_output_bit_length)),
+    m_hash(Keccak_FIPS_generic("Keccak_FIPS_generic(tailpadding=00)", output_bit_length, 512, 00, 2)),
     m_pad_byte_length(136)
    {
-   if(!m_hash)
-      {
-      throw Internal_Error("could not instantiate Keccak_FIPS_512 for KMAC256, this should not happen");
-      }
    // ensure valid output length
    byte_len_from_bit_len(m_output_bit_length);
    }
 
 void KMAC256::add_data(unsigned char const* data, unsigned long data_len)
    {
-   m_hash->update(data, data_len);
+   verify_key_set(m_key_set);
+   m_hash.update(data, data_len);
    }
 
 void KMAC256::final_result(unsigned char* output)
    {
+
+   verify_key_set(m_key_set);
    std::vector<uint8_t> tail;
    right_encode(m_output_bit_length, tail);
-   tail.push_back(0);
-   m_hash->update(tail);
+   m_hash.update(tail);
+
    std::vector<uint8_t> result;
-   m_hash->final(result);
+   m_hash.final(result);
    BOTAN_ASSERT_EQUAL(result.size(),  m_output_bit_length/8, "consistent output length" );
    memcpy(output, &result[0], result.size());
    }
@@ -243,7 +218,8 @@ void KMAC256::final_result(unsigned char* output)
 void KMAC256::key_schedule(const uint8_t key[], size_t key_length)
    {
 
-   m_hash->clear();
+   m_hash.clear();
+   zap(m_key);
    m_key.insert(m_key.end(), &key[0], &key[key_length]);
    m_key_set = true;
    }

@@ -10,6 +10,7 @@
 
 #include <botan/mac.h>
 #include <botan/hash.h>
+#include <botan/internal/keccak_fips.h>
 
 namespace Botan {
 
@@ -44,7 +45,7 @@ class KMAC256 final : public MessageAuthenticationCode
       secure_vector<uint8_t> m_key;
       bool m_key_set = false;
 
-      std::unique_ptr<HashFunction> m_hash;
+      Keccak_FIPS_generic m_hash;
       size_t m_pad_byte_length;
    };
 

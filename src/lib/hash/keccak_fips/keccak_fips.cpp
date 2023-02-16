@@ -19,7 +19,6 @@ namespace Botan {
 
 
 //static
-
 void Keccak_FIPS_generic::permute(uint64_t A[25])
    {
 #if defined(BOTAN_HAS_KECCKAK_FIPS_BMI2)
