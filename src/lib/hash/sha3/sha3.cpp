@@ -6,10 +6,7 @@
 */
 
 #include <botan/internal/sha3.h>
-#include <botan/internal/sha3_round.h>
-#include <botan/internal/loadstor.h>
 #include <botan/exceptn.h>
-#include <botan/internal/cpuid.h>
 
 namespace Botan {
 
