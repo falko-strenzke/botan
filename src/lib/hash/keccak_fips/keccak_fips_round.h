@@ -1,17 +1,18 @@
+
 /*
 * (C) 2010,2016,2021 Jack Lloyd
 *
 * Botan is released under the Simplified BSD License (see license.txt)
 */
 
-#ifndef BOTAN_SHA3_ROUND_H_
-#define BOTAN_SHA3_ROUND_H_
+#ifndef BOTAN_KECCAK_FIPS_ROUND_H_
+#define BOTAN_KECCAK_FIPS_ROUND_H_
 
 #include <botan/types.h>
 #include <botan/internal/rotate.h>
 
 /*
-A bug in Clang 12 and XCode 13 cause a miscompilation of SHA3_round
+A bug in Clang 12 and XCode 13 cause a miscompilation of KECCAK_FIPS_round
 with optimization levels -O2 and higher.
 
 For details
@@ -22,16 +23,16 @@ For details
 #if    defined(__clang__) && \
     (( defined(__apple_build_version__) && __clang_major__ == 13) || \
      (!defined(__apple_build_version__) && __clang_major__ == 12))
-  #define BOTAN_HAS_BROKEN_CLANG_SHA3
+  #define BOTAN_HAS_BROKEN_CLANG_KECCAK_FIPS
 #endif
 
-#if defined(BOTAN_HAS_BROKEN_CLANG_SHA3)
+#if defined(BOTAN_HAS_BROKEN_CLANG_KECCAK_FIPS)
   #include <tuple>
 #endif
 
 namespace Botan {
 
-#if defined(BOTAN_HAS_BROKEN_CLANG_SHA3)
+#if defined(BOTAN_HAS_BROKEN_CLANG_KECCAK_FIPS)
 
 namespace {
 
@@ -49,9 +50,9 @@ __attribute__((noinline)) decltype(auto) xor_CNs(const uint64_t A[25])
 
 #endif
 
-inline void SHA3_round(uint64_t T[25], const uint64_t A[25], uint64_t RC)
+inline void Keccak_FIPS_round(uint64_t T[25], const uint64_t A[25], uint64_t RC)
    {
-#if defined(BOTAN_HAS_BROKEN_CLANG_SHA3)
+#if defined(BOTAN_HAS_BROKEN_CLANG_KECCAK_FIPS)
    const auto [C0,C1,C2,C3,C4] = xor_CNs(A);
 #else
    const uint64_t C0 = A[0] ^ A[5] ^ A[10] ^ A[15] ^ A[20];
