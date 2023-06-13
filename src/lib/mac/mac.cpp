@@ -41,6 +41,10 @@
    #include <botan/internal/blake2bmac.h>
 #endif
 
+#if defined(BOTAN_HAS_KMAC)
+   #include <botan/internal/kmac.h>
+#endif
+
 namespace Botan {
 
 std::unique_ptr<MessageAuthenticationCode> MessageAuthenticationCode::create(std::string_view algo_spec,
@@ -107,6 +111,18 @@ std::unique_ptr<MessageAuthenticationCode> MessageAuthenticationCode::create(std
    }
 #endif
 
+#if defined(BOTAN_HAS_KMAC)
+   if(req.algo_name() == "KMAC256") {
+      if(provider.empty() || provider == "base") {
+         if(req.arg_count() != 1) {
+            throw Invalid_Argument(
+               "invalid algorithm specification for KMAC: need exactly one argument for output bit length");
+         }
+         return std::make_unique<KMAC256>(req.arg_as_integer(0));
+      }
+   }
+#endif
+
    BOTAN_UNUSED(req);
    BOTAN_UNUSED(provider);
 
@@ -125,6 +141,7 @@ std::unique_ptr<MessageAuthenticationCode> MessageAuthenticationCode::create_or_
    }
    throw Lookup_Error("MAC", algo, provider);
 }
+
 
 void MessageAuthenticationCode::start_msg(const uint8_t nonce[], size_t nonce_len) {
    BOTAN_UNUSED(nonce);
