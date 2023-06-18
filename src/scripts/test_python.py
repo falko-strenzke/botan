@@ -146,6 +146,19 @@ class BotanPythonTests(unittest.TestCase):
 
         self.assertEqual(hex_encode(expected), hex_encode(produced))
 
+    def test_kmac(self):
+        kmac = botan.MsgAuthCode('KMAC256(128)')
+        self.assertEqual(kmac.algo_name(), 'KMAC256(128)')
+        kmac.set_key(hex_decode('6B657931323334'))
+        kmac.set_nonce(hex_decode(''))
+        kmac.update(hex_decode('48656C6C6F'))
+
+        expected = hex_decode('749a073a39cb16c686442a245d449eeb')
+
+        produced = kmac.final()
+
+        self.assertEqual(hex_encode(expected), hex_encode(produced))
+
     def test_rng(self):
         user_rng = botan.RandomNumberGenerator("user")
 
