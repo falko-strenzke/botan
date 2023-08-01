@@ -225,7 +225,7 @@ std::string map_to_bogo_error(const std::string& e) {
       {"Server sent ECC curve prohibited by policy", ":WRONG_CURVE:"},
       {"group was not advertised as supported", ":WRONG_CURVE:"},
       {"group was already offered", ":WRONG_CURVE:"},
-      {"Server selected an unexpected key exchange group.", ":WRONG_CURVE:"},
+      {"Server selected a key exchange group we didn't offer.", ":WRONG_CURVE:"},
       {"TLS 1.3 Server Hello selected a different version", ":SECOND_SERVERHELLO_VERSION_MISMATCH:"},
       {"Version downgrade received after Hello Retry", ":SECOND_SERVERHELLO_VERSION_MISMATCH:"},
       {"protected change cipher spec received", ":UNEXPECTED_RECORD:"},
@@ -358,7 +358,7 @@ class Shim_Socket final {
       using unique_addrinfo_t = std::unique_ptr<addrinfo, decltype(&::freeaddrinfo)>;
 
    public:
-      Shim_Socket(const std::string& hostname, int port) : m_socket(-1) {
+      Shim_Socket(const std::string& hostname, int port, const bool ipv6) : m_socket(-1) {
          addrinfo hints;
          std::memset(&hints, 0, sizeof(hints));
          hints.ai_family = AF_UNSPEC;
@@ -381,7 +381,7 @@ class Shim_Socket final {
          }
 
          for(addrinfo* rp = res.get(); (m_socket == -1) && (rp != nullptr); rp = rp->ai_next) {
-            if(rp->ai_family != AF_INET && rp->ai_family != AF_INET6) {
+            if((!ipv6 && rp->ai_family != AF_INET) || (ipv6 && rp->ai_family != AF_INET6)) {
                continue;
             }
 
@@ -715,6 +715,7 @@ std::unique_ptr<Shim_Arguments> parse_options(char* argv[]) {
       "implicit-handshake",
       "install-cert-compression-algs",
       "install-ddos-callback",
+      "ipv6",
       "is-handshaker-supported",
       //"jdk11-workaround",
       "key-update",
@@ -827,6 +828,7 @@ std::unique_ptr<Shim_Arguments> parse_options(char* argv[]) {
       "read-size",
       "resume-count",
       "resumption-delay",
+      "shim-id",
    };
 
    const std::set<std::string> bogo_shim_int_vec_opts{
@@ -852,27 +854,47 @@ class Shim_Policy final : public Botan::TLS::Policy {
       void incr_session_established() { m_sessions += 1; }
 
       std::vector<std::string> allowed_ciphers() const override {
-         return {
+         std::vector<std::string> allowed_without_aes = {
+            "ChaCha20Poly1305",
+            "Camellia-256/GCM",
+            "Camellia-128/GCM",
+            "ARIA-256/GCM",
+            "ARIA-128/GCM",
+            "Camellia-256",
+            "Camellia-128",
+            "SEED",
+         };
+
+         std::vector<std::string> allowed_just_aes = {
             "AES-256/OCB(12)",
             "AES-128/OCB(12)",
-            "ChaCha20Poly1305",
             "AES-256/GCM",
             "AES-128/GCM",
             "AES-256/CCM",
             "AES-128/CCM",
             "AES-256/CCM(8)",
             "AES-128/CCM(8)",
-            "Camellia-256/GCM",
-            "Camellia-128/GCM",
-            "ARIA-256/GCM",
-            "ARIA-128/GCM",
             "AES-256",
             "AES-128",
-            "Camellia-256",
-            "Camellia-128",
-            "SEED",
-            "3DES",
          };
+
+         // 3DES is not supported by default anymore, only if the test runner
+         // explicitly enables it via -cipher=
+         const std::string cipher_limit = m_args.get_string_opt_or_else("cipher", "");
+         if(cipher_limit == "3DES") {
+            return {"3DES"};
+         } else if(cipher_limit == "DEFAULT:!AES") {
+            return allowed_without_aes;
+         } else {
+            // ignore this very specific config (handled in the overload of ciphersuite_list)
+            if(!cipher_limit.empty() &&
+               cipher_limit !=
+                  "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:[TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256|TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA]:TLS_RSA_WITH_AES_128_GCM_SHA256:TLS_RSA_WITH_AES_128_CBC_SHA:[TLS_RSA_WITH_AES_256_GCM_SHA384|TLS_RSA_WITH_AES_256_CBC_SHA]") {
+               shim_exit_with_error("Unknown cipher limit " + cipher_limit);
+            }
+         }
+
+         return Botan::concat(allowed_without_aes, allowed_just_aes);
       }
 
       std::vector<std::string> allowed_signature_hashes() const override {
@@ -1191,23 +1213,9 @@ std::vector<uint16_t> Shim_Policy::ciphersuite_list(Botan::TLS::Protocol_Version
          const auto suite = *i;
 
          // Can we use it?
-         if(suite.valid() == false || !suite.usable_in_version(version)) {
+         if(suite.valid() == false || !suite.usable_in_version(version) ||
+            !Botan::value_exists(allowed_ciphers(), suite.cipher_algo())) {
             continue;
-         }
-
-         if(!cipher_limit.empty()) {
-            if(cipher_limit == "DEFAULT:!AES") {
-               const std::string suite_algo = suite.cipher_algo();
-
-               if(suite_algo == "AES-128" || suite_algo == "AES-256" || suite_algo == "AES-128/GCM" ||
-                  suite_algo == "AES-256/GCM" || suite_algo == "AES-128/CCM" || suite_algo == "AES-256/CCM" ||
-                  suite_algo == "AES-128/CCM(8)" || suite_algo == "AES-256/CCM(8)" || suite_algo == "AES-128/OCB(12)" ||
-                  suite_algo == "AES-256/OCB(12)") {
-                  continue;
-               }
-            } else {
-               shim_exit_with_error("Unknown cipher " + cipher_limit);
-            }
          }
 
          ciphersuite_codes.push_back(suite.ciphersuite_code());
@@ -1220,10 +1228,18 @@ std::vector<uint16_t> Shim_Policy::ciphersuite_list(Botan::TLS::Protocol_Version
 class Shim_Credentials final : public Botan::Credentials_Manager {
    public:
       Shim_Credentials(const Shim_Arguments& args) : m_args(args) {
-         m_psk_identity = m_args.get_string_opt_or_else("psk-identity", "");
+         const auto psk_identity = m_args.get_string_opt_or_else("psk-identity", "");
+         const auto psk_str = m_args.get_string_opt_or_else("psk", "");
 
-         const std::string psk_str = m_args.get_string_opt_or_else("psk", "");
-         m_psk = Botan::SymmetricKey(reinterpret_cast<const uint8_t*>(psk_str.data()), psk_str.size());
+         if(!psk_identity.empty() || !psk_str.empty()) {
+            // If the shim received a -psk param but no -psk-identity param,
+            // we have to initialize the identity as "empty string".
+            m_psk_identity = psk_identity;
+         }
+
+         if(!psk_str.empty()) {
+            m_psk = Botan::SymmetricKey(reinterpret_cast<const uint8_t*>(psk_str.data()), psk_str.size());
+         }
 
          if(m_args.option_used("key-file") && m_args.option_used("cert-file")) {
             Botan::DataSource_Stream key_stream(m_args.get_string_opt("key-file"));
@@ -1259,28 +1275,51 @@ class Shim_Credentials final : public Botan::Credentials_Manager {
       std::string psk_identity(const std::string& /*type*/,
                                const std::string& /*context*/,
                                const std::string& /*identity_hint*/) override {
-         return m_psk_identity;
+         return m_psk_identity.value_or("");
       }
 
       std::string psk_identity_hint(const std::string& /*type*/, const std::string& /*context*/) override {
-         return m_psk_identity;
+         return m_psk_identity.value_or("");
       }
 
-      Botan::SymmetricKey psk(const std::string& type,
-                              const std::string& context,
-                              const std::string& identity) override {
-         if(type == "tls-server" && context == "session-ticket") {
-            return Botan::SymmetricKey("ABCDEF0123456789");
+      Botan::secure_vector<uint8_t> session_ticket_key() override {
+         return Botan::hex_decode_locked("ABCDEF0123456789");
+      }
+
+      Botan::secure_vector<uint8_t> dtls_cookie_secret() override {
+         return Botan::hex_decode_locked("F00FB00FD00F100F700F");
+      }
+
+      std::vector<Botan::TLS::ExternalPSK> find_preshared_keys(
+         std::string_view host,
+         Botan::TLS::Connection_Side whoami,
+         const std::vector<std::string>& identities = {},
+         const std::optional<std::string>& prf = std::nullopt) override {
+         if(!m_psk_identity.has_value()) {
+            return Botan::Credentials_Manager::find_preshared_keys(host, whoami, identities, prf);
          }
 
-         if(type == "tls-server" && context == "dtls-cookie-secret") {
-            return Botan::SymmetricKey("F00FB00FD00F100F700F");
-         }
+         auto id_matches =
+            identities.empty() || std::find(identities.begin(), identities.end(), m_psk_identity) != identities.end();
 
-         if(identity != m_psk_identity) {
+         if(!id_matches) {
             throw Shim_Exception("Unexpected PSK identity");
          }
-         return m_psk;
+
+         if(!m_psk.has_value()) {
+            throw Shim_Exception("PSK identified but not set");
+         }
+
+         std::vector<Botan::TLS::ExternalPSK> psks;
+
+         // Currently, BoGo tests PSK with TLS 1.2 only. In TLS 1.2 the PRF does not
+         // need to be specified for PSKs.
+         //
+         // TODO: Once BoGo has tests for TLS 1.3 with externally provided PSKs, this
+         //       will need to be handled somehow.
+         const std::string psk_prf = "SHA-256";
+         psks.emplace_back(m_psk_identity.value(), psk_prf, m_psk->bits_of());
+         return psks;
       }
 
       std::vector<Botan::X509_Certificate> cert_chain(
@@ -1312,8 +1351,8 @@ class Shim_Credentials final : public Botan::Credentials_Manager {
 
    private:
       const Shim_Arguments& m_args;
-      Botan::SymmetricKey m_psk;
-      std::string m_psk_identity;
+      std::optional<Botan::SymmetricKey> m_psk;
+      std::optional<std::string> m_psk_identity;
       std::shared_ptr<Botan::Private_Key> m_key;
       std::vector<Botan::X509_Certificate> m_cert_chain;
 };
@@ -1683,9 +1722,17 @@ int main(int /*argc*/, char* argv[]) {
 
       for(size_t i = 0; i != resume_count + 1; ++i) {
          auto execute_test = [&](const std::string& hostname) {
-            Shim_Socket socket(hostname, port);
+            Shim_Socket socket(hostname, port, args->flag_set("ipv6"));
 
             shim_log("Connection " + std::to_string(i + 1) + "/" + std::to_string(resume_count + 1));
+
+            // The ShimID must be written on the socket as a 64-bit little-endian integer
+            // *before* any test data is transferred
+            // See: https://github.com/google/boringssl/commit/50ee09552cde1c2019bef24520848d041920cfd4
+            shim_log("Sending ShimID: " + std::to_string(args->get_int_opt("shim-id")));
+            std::array<uint8_t, 8> shim_id;
+            Botan::store_le(static_cast<uint64_t>(args->get_int_opt("shim-id")), shim_id.data());
+            socket.write(shim_id.data(), shim_id.size());
 
             auto policy = std::make_shared<Shim_Policy>(*args);
             auto callbacks = std::make_shared<Shim_Callbacks>(*args, socket, *policy);

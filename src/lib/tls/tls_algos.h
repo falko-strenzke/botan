@@ -15,9 +15,7 @@
 
 //BOTAN_FUTURE_INTERNAL_HEADER(tls_algos.h)
 
-namespace Botan {
-
-namespace TLS {
+namespace Botan::TLS {
 
 enum class Cipher_Algo {
    CHACHA20_POLY1305,
@@ -114,6 +112,10 @@ constexpr bool is_dh(const Group_Params group) {
           group == Group_Params::FFDHE_6144 || group == Group_Params::FFDHE_8192;
 }
 
+constexpr bool is_kem(const Group_Params) {
+   return false;  // no KEMs implemented, yet
+}
+
 std::string group_param_to_string(Group_Params group);
 Group_Params group_param_from_string(std::string_view group_name);
 bool group_param_is_dh(Group_Params group);
@@ -137,8 +139,6 @@ inline bool key_exchange_is_psk(Kex_Algo m) {
    return (m == Kex_Algo::PSK || m == Kex_Algo::ECDHE_PSK || m == Kex_Algo::DHE_PSK);
 }
 
-}  // namespace TLS
-
-}  // namespace Botan
+}  // namespace Botan::TLS
 
 #endif

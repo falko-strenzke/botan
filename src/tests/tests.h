@@ -318,18 +318,20 @@ class Test {
 
             template <typename T>
             bool test_not_null(const std::string& what, const T& ptr) {
-               if(ptr == nullptr)
+               if(ptr == nullptr) {
                   return test_failure(what + " was null");
-               else
+               } else {
                   return test_success(what + " was not null");
+               }
             }
 
             template <typename T>
             bool test_not_nullopt(const std::string& what, std::optional<T> val) {
-               if(val == std::nullopt)
+               if(val == std::nullopt) {
                   return test_failure(what + " was nullopt");
-               else
+               } else {
                   return test_success(what + " was not nullopt");
+               }
             }
 
             bool test_eq(const std::string& what, const char* produced, const char* expected);
@@ -354,7 +356,7 @@ class Test {
 
             template <typename I1, typename I2>
             bool test_int_eq(const std::string& what, I1 x, I2 y) {
-               return test_eq(what.c_str(), static_cast<size_t>(x), static_cast<size_t>(y));
+               return test_eq(what, static_cast<size_t>(x), static_cast<size_t>(y));
             }
 
             bool test_lt(const std::string& what, size_t produced, size_t expected);
@@ -525,18 +527,19 @@ class Test {
          private:
             template <typename T>
             std::string to_string(const T& v) {
-               if constexpr(detail::is_optional_v<T>)
+               if constexpr(detail::is_optional_v<T>) {
                   return (v.has_value()) ? to_string(v.value()) : std::string("std::nullopt");
-               else if constexpr(detail::has_Botan_to_string<T>)
+               } else if constexpr(detail::has_Botan_to_string<T>) {
                   return Botan::to_string(v);
-               else if constexpr(detail::has_ostream_operator<T>) {
+               } else if constexpr(detail::has_ostream_operator<T>) {
                   std::ostringstream oss;
                   oss << v;
                   return oss.str();
-               } else if constexpr(detail::has_std_to_string<T>)
+               } else if constexpr(detail::has_std_to_string<T>) {
                   return std::to_string(v);
-               else
+               } else {
                   return "<?>";
+               }
             }
 
          private:
@@ -555,13 +558,17 @@ class Test {
 
       virtual std::vector<std::string> possible_providers(const std::string&);
 
+      void set_test_name(const std::string& name) { m_test_name = name; }
+
+      const std::string& test_name() const { return m_test_name; }
+
       void set_registration_location(CodeLocation location) { m_registration_location = std::move(location); }
 
       const std::optional<CodeLocation>& registration_location() const { return m_registration_location; }
 
       /// @p smoke_test are run first in an unfiltered test run
-      static void register_test(std::string category,
-                                std::string name,
+      static void register_test(const std::string& category,
+                                const std::string& name,
                                 bool smoke_test,
                                 bool needs_serialization,
                                 std::function<std::unique_ptr<Test>()> maker_fn);
@@ -640,6 +647,7 @@ class Test {
       static Test_Options m_opts;
       static std::shared_ptr<Botan::RandomNumberGenerator> m_test_rng;
 
+      std::string m_test_name;                              // The string ID that was used to register this test
       std::optional<CodeLocation> m_registration_location;  /// The source file location where the test was registered
 };
 
@@ -649,13 +657,14 @@ class Test {
 template <typename Test_Class>
 class TestClassRegistration {
    public:
-      TestClassRegistration(std::string category,
-                            std::string name,
+      TestClassRegistration(const std::string& category,
+                            const std::string& name,
                             bool smoke_test,
                             bool needs_serialization,
                             CodeLocation registration_location) {
-         Test::register_test(std::move(category), std::move(name), smoke_test, needs_serialization, [=] {
+         Test::register_test(category, name, smoke_test, needs_serialization, [=] {
             auto test = std::make_unique<Test_Class>();
+            test->set_test_name(name);
             test->set_registration_location(registration_location);
             return test;
          });
@@ -725,14 +734,15 @@ class FnTest : public Test {
 class TestFnRegistration {
    public:
       template <typename... TestFns>
-      TestFnRegistration(std::string category,
-                         std::string name,
+      TestFnRegistration(const std::string& category,
+                         const std::string& name,
                          bool smoke_test,
                          bool needs_serialization,
                          CodeLocation registration_location,
                          TestFns... fn) {
-         Test::register_test(std::move(category), std::move(name), smoke_test, needs_serialization, [=] {
+         Test::register_test(category, name, smoke_test, needs_serialization, [=] {
             auto test = std::make_unique<FnTest>(fn...);
+            test->set_test_name(name);
             test->set_registration_location(std::move(registration_location));
             return test;
          });
@@ -777,9 +787,9 @@ class VarMap {
       uint32_t get_req_u32(const std::string& key) const;
       uint64_t get_req_u64(const std::string& key) const;
 
-      size_t get_opt_sz(const std::string& key, const size_t def_value) const;
+      size_t get_opt_sz(const std::string& key, size_t def_value) const;
 
-      uint64_t get_opt_u64(const std::string& key, const uint64_t def_value) const;
+      uint64_t get_opt_u64(const std::string& key, uint64_t def_value) const;
 
    private:
       std::unordered_map<std::string, std::string> m_vars;

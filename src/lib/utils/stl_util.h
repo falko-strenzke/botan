@@ -23,12 +23,13 @@
 
 namespace Botan {
 
-inline std::vector<uint8_t> to_byte_vector(std::string_view s) {
-   return std::vector<uint8_t>(s.cbegin(), s.cend());
+template <concepts::contiguous_container T = std::vector<uint8_t>>
+inline T to_byte_vector(std::string_view s) {
+   return T(s.cbegin(), s.cend());
 }
 
-inline std::string to_string(const secure_vector<uint8_t>& bytes) {
-   return std::string(bytes.cbegin(), bytes.cend());
+inline std::string to_string(std::span<const uint8_t> bytes) {
+   return std::string(bytes.begin(), bytes.end());
 }
 
 /**
@@ -65,16 +66,18 @@ std::set<K> map_keys_as_set(const std::multimap<K, V>& kv) {
 template <typename K, typename V>
 inline V search_map(const std::map<K, V>& mapping, const K& key, const V& null_result = V()) {
    auto i = mapping.find(key);
-   if(i == mapping.end())
+   if(i == mapping.end()) {
       return null_result;
+   }
    return i->second;
 }
 
 template <typename K, typename V, typename R>
 inline R search_map(const std::map<K, V>& mapping, const K& key, const R& null_result, const R& found_result) {
    auto i = mapping.find(key);
-   if(i == mapping.end())
+   if(i == mapping.end()) {
       return null_result;
+   }
    return found_result;
 }
 
@@ -91,9 +94,11 @@ void multimap_insert(std::multimap<K, V>& multimap, const K& key, const V& value
 */
 template <typename T, typename OT>
 bool value_exists(const std::vector<T>& vec, const OT& val) {
-   for(size_t i = 0; i != vec.size(); ++i)
-      if(vec[i] == val)
+   for(size_t i = 0; i != vec.size(); ++i) {
+      if(vec[i] == val) {
          return true;
+      }
+   }
    return false;
 }
 
@@ -101,10 +106,11 @@ template <typename T, typename Pred>
 void map_remove_if(Pred pred, T& assoc) {
    auto i = assoc.begin();
    while(i != assoc.end()) {
-      if(pred(i->first))
+      if(pred(i->first)) {
          assoc.erase(i++);
-      else
+      } else {
          i++;
+      }
    }
 }
 
