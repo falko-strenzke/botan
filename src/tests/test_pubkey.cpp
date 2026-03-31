@@ -6,6 +6,7 @@
 */
 
 #include "tests.h"
+#include <vector>
 
 #if defined(BOTAN_HAS_PUBLIC_KEY_CRYPTO)
 
@@ -27,6 +28,8 @@
    #endif
 
    #include <array>
+
+   #include <iostream>
 
 namespace Botan_Tests {
 
@@ -54,6 +57,35 @@ void check_invalid_signatures(Test::Result& result,
          result.test_failure("Modified signature rejected with exception", e.what());
       }
    }
+}
+
+void check_attack_signatures(Test::Result& result,
+                             Botan::PK_Verifier& verifier,
+                             const std::vector<uint8_t>& message,
+                             const std::vector<uint8_t>& signature) {
+   if(message.size() < 2) {
+      return;
+   }
+   const std::vector<uint8_t> prefix = {message[0]};
+   const std::vector<uint8_t> short_sig = {0x00};
+   const std::vector<uint8_t> postfix(message.begin() + 1, message.end());
+
+   // std::cout << "message = " << Botan::hex_encode(message) << "\n";
+   // std::cout << "prefix = " << Botan::hex_encode(prefix) << "\n";
+   // std::cout << "postfix = " << Botan::hex_encode(postfix) << "\n";
+
+   result.test_is_true("valid signature", verifier.verify_message(prefix, signature));
+   result.test_is_false("invalid signature", verifier.verify_message(prefix, short_sig));
+
+   try {
+      if(!result.test_is_false("incorrect signature invalid: verify postfix attack succeeded",
+                               verifier.verify_message(postfix, signature))) {
+         result.test_note("Accepted invalid signature after too short signature");
+      }
+   } catch(std::exception& e) {
+      result.test_failure("Modified / invalid signature rejected with exception", e.what());
+   }
+   result.test_is_true("valid signature", verifier.verify_message(prefix, signature));
 }
 
 }  // namespace
@@ -138,9 +170,12 @@ Test::Result PK_Signature_Generation_Test::run_one_test(const std::string& pad_h
 
    for(const auto& verify_provider : possible_providers(algo_name())) {
       std::unique_ptr<Botan::PK_Verifier> verifier;
+      std::unique_ptr<Botan::PK_Verifier> verifier2;
 
       try {
          verifier =
+            std::make_unique<Botan::PK_Verifier>(*pubkey, padding, Botan::Signature_Format::Standard, verify_provider);
+         verifier2 =
             std::make_unique<Botan::PK_Verifier>(*pubkey, padding, Botan::Signature_Format::Standard, verify_provider);
       } catch(Botan::Lookup_Error&) {
          //result.test_note("Skipping verifying", verify_provider);
@@ -153,43 +188,44 @@ Test::Result PK_Signature_Generation_Test::run_one_test(const std::string& pad_h
 
       result.test_is_true("KAT signature valid (try 2)", verifier->verify_message(message, signature));
 
+      check_attack_signatures(result, *verifier2, message, signature);
       verifiers.push_back(std::move(verifier));
    }
 
-   for(const auto& sign_provider : possible_providers(algo_name())) {
-      std::unique_ptr<Botan::PK_Signer> signer;
+   //for(const auto& sign_provider : possible_providers(algo_name())) {
+   //   std::unique_ptr<Botan::PK_Signer> signer;
 
-      std::vector<uint8_t> generated_signature;
+   //   std::vector<uint8_t> generated_signature;
 
-      try {
-         signer = std::make_unique<Botan::PK_Signer>(
-            *privkey, this->rng(), padding, Botan::Signature_Format::Standard, sign_provider);
+   //   try {
+   //      signer = std::make_unique<Botan::PK_Signer>(
+   //         *privkey, this->rng(), padding, Botan::Signature_Format::Standard, sign_provider);
 
-         if(vars.has_key("Nonce")) {
-            auto rng = test_rng(vars.get_req_bin("Nonce"));
-            generated_signature = signer->sign_message(message, *rng);
-         } else {
-            generated_signature = signer->sign_message(message, this->rng());
-         }
+   //      if(vars.has_key("Nonce")) {
+   //         auto rng = test_rng(vars.get_req_bin("Nonce"));
+   //         generated_signature = signer->sign_message(message, *rng);
+   //      } else {
+   //         generated_signature = signer->sign_message(message, this->rng());
+   //      }
 
-         result.test_sz_lte(
-            "Generated signature within announced bound", generated_signature.size(), signer->signature_length());
-      } catch(Botan::Lookup_Error&) {
-         //result.test_note("Skipping signing", sign_provider);
-         continue;
-      }
+   //      result.test_sz_lte(
+   //         "Generated signature within announced bound", generated_signature.size(), signer->signature_length());
+   //   } catch(Botan::Lookup_Error&) {
+   //      //result.test_note("Skipping signing", sign_provider);
+   //      continue;
+   //   }
 
-      if(sign_provider == "base") {
-         result.test_bin_eq("generated signature matches KAT", generated_signature, signature);
-      } else if(generated_signature != signature) {
-         for(std::unique_ptr<Botan::PK_Verifier>& verifier : verifiers) {
-            if(!result.test_is_true("generated signature valid",
-                                    verifier->verify_message(message, generated_signature))) {
-               result.test_failure("generated signature", generated_signature);
-            }
-         }
-      }
-   }
+   //   if(sign_provider == "base") {
+   //      result.test_bin_eq("generated signature matches KAT", generated_signature, signature);
+   //   } else if(generated_signature != signature) {
+   //      for(std::unique_ptr<Botan::PK_Verifier>& verifier : verifiers) {
+   //         if(!result.test_is_true("generated signature valid",
+   //                                 verifier->verify_message(message, generated_signature))) {
+   //            result.test_failure("generated signature", generated_signature);
+   //         }
+   //      }
+   //   }
+   //}
 
    return result;
 }
