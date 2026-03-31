@@ -74,7 +74,7 @@ void check_attack_signatures(Test::Result& result,
    // std::cout << "prefix = " << Botan::hex_encode(prefix) << "\n";
    // std::cout << "postfix = " << Botan::hex_encode(postfix) << "\n";
 
-   result.test_is_true("valid signature", verifier.verify_message(prefix, signature));
+   result.test_is_true("valid signature", verifier.verify_message(message, signature));
    result.test_is_false("invalid signature", verifier.verify_message(prefix, short_sig));
 
    try {
