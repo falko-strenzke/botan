@@ -6,6 +6,7 @@
 */
 
 #include "tests.h"
+#include <iostream>
 
 #if defined(BOTAN_HAS_PUBLIC_KEY_CRYPTO)
 
@@ -145,8 +146,8 @@ Test::Result PK_Signature_Generation_Test::run_one_test(const std::string& pad_h
       test_name << "-" << vars.get_req_str("Group");
    }
    test_name << "/" << padding << " signature generation";
-
-   Test::Result result(test_name.str());
+   std::string test_name_str = test_name.str();
+   Test::Result result(test_name_str);
 
    std::unique_ptr<Botan::Private_Key> privkey;
    try {
@@ -195,12 +196,14 @@ Test::Result PK_Signature_Generation_Test::run_one_test(const std::string& pad_h
          signer = std::make_unique<Botan::PK_Signer>(
             *privkey, this->rng(), padding, Botan::Signature_Format::Standard, sign_provider);
 
+         std::cout << "before signing: " << test_name_str << "\n";
          if(vars.has_key("Nonce")) {
             auto rng = test_rng(vars.get_req_bin("Nonce"));
             generated_signature = signer->sign_message(message, *rng);
          } else {
             generated_signature = signer->sign_message(message, this->rng());
          }
+         std::cout << "after signing\n";
 
          result.test_sz_lte(
             "Generated signature within announced bound", generated_signature.size(), signer->signature_length());

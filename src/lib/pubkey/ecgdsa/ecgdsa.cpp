@@ -11,6 +11,7 @@
 #include <botan/ec_group.h>
 #include <botan/internal/keypair.h>
 #include <botan/internal/pk_ops_impl.h>
+#include <iostream>
 
 namespace Botan {
 
@@ -62,7 +63,9 @@ std::vector<uint8_t> ECGDSA_Signature_Operation::raw_sign(std::span<const uint8_
 
    const auto k = EC_Scalar::random(m_group, rng);
 
+   std::cout << " before gk_x_mod_order\n";
    const auto r = EC_Scalar::gk_x_mod_order(k, rng);
+   std::cout << " after gk_x_mod_order\n";
 
    const auto s = m_x * ((k * r) - m);
 

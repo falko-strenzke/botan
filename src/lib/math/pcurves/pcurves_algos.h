@@ -10,6 +10,7 @@
 #include <botan/types.h>
 #include <botan/internal/ct_utils.h>
 #include <algorithm>
+#include <iostream>
 #include <span>
 #include <vector>
 
@@ -95,8 +96,10 @@ inline constexpr auto to_affine(const typename C::ProjectivePoint& pt) {
 template <typename C>
 auto to_affine_x(const typename C::ProjectivePoint& pt) {
    if constexpr(curve_supports_fe_invert2<C>) {
+      std::cout << "pcurve_algos.h to_affine() using C::fe_invert2()\n";
       return pt.x() * C::fe_invert2(pt.z());
    } else {
+      std::cout << "pcurve_algos.h to_affine() using affine_x = (z⁻¹)² ∙ x)\n";
       const auto z_inv = invert_field_element<C>(pt.z());
       const auto z2_inv = z_inv.square();
       return pt.x() * z2_inv;

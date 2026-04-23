@@ -7,9 +7,11 @@
 #ifndef BOTAN_PCURVES_MUL_H_
 #define BOTAN_PCURVES_MUL_H_
 
+#include <botan/hex.h>
 #include <botan/types.h>
 #include <botan/internal/ct_utils.h>
 #include <botan/internal/pcurves_algos.h>
+#include <iostream>
 #include <vector>
 
 namespace Botan {
@@ -306,6 +308,7 @@ template <typename C, size_t WindowBits, typename BlindedScalar>
 typename C::ProjectivePoint basemul_booth_exec(std::span<const typename C::AffinePoint> table,
                                                const BlindedScalar& scalar,
                                                RandomNumberGenerator& rng) {
+   std::cout << "   basemul_booth_exec() started\n";
    static constexpr size_t WindowElements = 1 << (WindowBits - 1);
 
    const size_t windows = (scalar.bits() + WindowBits) / WindowBits;
@@ -341,6 +344,7 @@ typename C::ProjectivePoint basemul_booth_exec(std::span<const typename C::Affin
    }
 
    CT::unpoison(accum);
+   std::cout << "   basemul_booth_exec() finished\n";
    return accum;
 }
 
