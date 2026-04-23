@@ -8,6 +8,7 @@
 
 #include <botan/mem_ops.h>
 #include <botan/internal/buffer_stuffer.h>
+#include <iostream>
 
 namespace Botan {
 
@@ -59,6 +60,7 @@ std::unique_ptr<EC_Scalar_Data> EC_Scalar_Data_PC::negate() const {
 }
 
 std::unique_ptr<EC_Scalar_Data> EC_Scalar_Data_PC::invert() const {
+   std::cout << "  EC_Scalar_Data_PC::invert() calling further ...\n";
    return std::make_unique<EC_Scalar_Data_PC>(m_group, m_group->pcurve().scalar_invert(m_v));
 }
 

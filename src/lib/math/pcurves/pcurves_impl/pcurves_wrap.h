@@ -10,6 +10,7 @@
 #include <botan/exceptn.h>
 #include <botan/internal/pcurves.h>
 #include <botan/internal/pcurves_impl.h>
+#include <iostream>
 
 namespace Botan::PCurve {
 
@@ -177,9 +178,13 @@ class PrimeOrderCurveImpl final : public PrimeOrderCurve {
       }
 
       Scalar base_point_mul_x_mod_order(const Scalar& scalar, RandomNumberGenerator& rng) const override {
+         std::cout << "   PrimeOrderCurveImpl::base_point_mul_x_mod_order(): before mul\n";
          auto pt = m_mul_by_g.mul(from_stash(scalar), rng);
+         std::cout << "   PrimeOrderCurveImpl::base_point_mul_x_mod_order(): after mul\n";
          std::array<uint8_t, C::FieldElement::BYTES> x_bytes{};
+         std::cout << "   PrimeOrderCurveImpl::base_point_mul_x_mod_order(): before conversion to affine\n";
          to_affine_x<C>(pt).serialize_to(std::span{x_bytes});
+         std::cout << "   PrimeOrderCurveImpl::base_point_mul_x_mod_order(): after conversion to affine\n";
          // Reduction might be required (if unlikely)
          return stash(C::Scalar::from_wide_bytes(std::span<const uint8_t, C::FieldElement::BYTES>{x_bytes}));
       }
@@ -305,11 +310,16 @@ class PrimeOrderCurveImpl final : public PrimeOrderCurve {
       Scalar scalar_square(const Scalar& s) const override { return stash(from_stash(s).square()); }
 
       Scalar scalar_invert(const Scalar& ss) const override {
+         std::cout << "  PrimeOrderCurveImpl::scalar_invert(): dispatching ...";
          auto s = from_stash(ss);
          if constexpr(curve_supports_scalar_invert<C>) {
+            std::cout << " to C::scalar_invert()\n";
             return stash(C::scalar_invert(s));
          } else {
-            return stash(s.invert());
+            std::cout << " to Scalar::invert()\n";
+            auto result = stash(s.invert());
+            std::cout << "  finished Scalar::invert()\n";
+            return result;
          }
       }
 

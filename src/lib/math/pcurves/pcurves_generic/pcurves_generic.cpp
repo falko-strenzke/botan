@@ -18,6 +18,7 @@
 #include <botan/internal/pcurves_mul.h>
 #include <botan/internal/primality.h>
 #include <algorithm>
+#include <iostream>
 
 namespace Botan::PCurve {
 
@@ -420,7 +421,10 @@ class GenericScalar final {
          return GenericScalar(m_curve, r);
       }
 
-      GenericScalar invert() const { return pow_vartime(m_curve->_params().order_minus_2()); }
+      GenericScalar invert() const {
+         std::cout << "  GenericScalar invert(): using pow_vartime()\n";
+         return pow_vartime(m_curve->_params().order_minus_2());
+      }
 
       /**
       * Helper for variable time BEEA
@@ -755,7 +759,10 @@ class GenericField final {
          return GenericField(m_curve, r);
       }
 
-      GenericField invert() const { return pow_vartime(m_curve->_params().field_minus_2()); }
+      GenericField invert() const {
+         std::cout << "  GenericField::invert() vartime\n";
+         return pow_vartime(m_curve->_params().field_minus_2());
+      }
 
       GenericField invert_vartime() const {
          // TODO take advantage of variable time here using eg BEEA
@@ -1227,6 +1234,8 @@ class GenericCurve final {
 class GenericBlindedScalarBits final {
    public:
       GenericBlindedScalarBits(const GenericScalar& scalar, RandomNumberGenerator& rng, size_t wb) {
+         std::cout << "GenericBlindedScalarBits ctor called for scalar = "
+                   << hex_encode(scalar.serialize<secure_vector<uint8_t>>()) << "\n";
          BOTAN_ASSERT_NOMSG(wb == 1 || wb == 2 || wb == 3 || wb == 4 || wb == 5 || wb == 6 || wb == 7);
 
          const auto& params = scalar.curve()->_params();
@@ -1455,6 +1464,7 @@ PrimeOrderCurve::ProjectivePoint GenericPrimeOrderCurve::mul_by_g(const Scalar& 
 
 PrimeOrderCurve::Scalar GenericPrimeOrderCurve::base_point_mul_x_mod_order(const Scalar& scalar,
                                                                            RandomNumberGenerator& rng) const {
+   std::cout << "   GenericPrimeOrderCurve::base_point_mul_x_mod_order called\n";
    BOTAN_STATE_CHECK(m_basemul != nullptr);
    auto pt_s = m_basemul->mul(from_stash(scalar), rng);
    const auto x_bytes = to_affine_x<GenericCurve>(pt_s).serialize<secure_vector<uint8_t>>();
@@ -1621,10 +1631,12 @@ PrimeOrderCurve::Scalar GenericPrimeOrderCurve::scalar_square(const Scalar& s) c
 }
 
 PrimeOrderCurve::Scalar GenericPrimeOrderCurve::scalar_invert(const Scalar& s) const {
+   std::cout << "  GenericPrimeOrderCurve::scalar_invert()\n";
    return stash(from_stash(s).invert());
 }
 
 PrimeOrderCurve::Scalar GenericPrimeOrderCurve::scalar_invert_vartime(const Scalar& s) const {
+   std::cout << "  GenericPrimeOrderCurve::scalar_invert_vartime()\n";
    return stash(from_stash(s).invert_vartime());
 }
 

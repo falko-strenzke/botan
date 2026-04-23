@@ -16,6 +16,7 @@
 #include <botan/internal/pcurves_mul.h>
 #include <botan/internal/pcurves_util.h>
 #include <concepts>
+#include <iostream>
 #include <vector>
 
 namespace Botan {
@@ -535,7 +536,10 @@ class IntMod final {
       * This function is only used if the curve does not provide an addition
       * chain for specific inversions (see for example pcurves_secp256r1.cpp)
       */
-      constexpr Self invert() const { return pow_vartime(Self::P_MINUS_2); }
+      constexpr Self invert() const {
+         std::cout << "   IntMod::invert: calling pow_vartime()\n";
+         return pow_vartime(Self::P_MINUS_2);
+      }
 
       /**
       * Helper for variable time BEEA
@@ -732,6 +736,12 @@ class IntMod final {
       * Convert the integer to standard representation and return the sequence of words
       */
       constexpr std::array<W, Self::N> to_words() const { return Rep::from_rep(m_val); }
+
+      constexpr std::vector<uint8_t> serialize() {
+         std::vector<uint8_t> result(Self::BYTES);
+         serialize_to(result);
+         return result;
+      }
 
       /**
       * Serialize the integer to a bytestring
@@ -1305,7 +1315,11 @@ class BlindedScalarBits final {
       size_t bits() const { return m_bits; }
 
       BlindedScalarBits(const typename C::Scalar& scalar, RandomNumberGenerator& rng) {
+         std::vector<uint8_t> dbg_scalar(C::Scalar::BYTES);
+         scalar.serialize_to(std::span{dbg_scalar}.template first<C::Scalar::BYTES>());
+         std::cout << "   BlindedScalarBits ctor called for scalar = " << hex_encode(dbg_scalar) << "\n";
          if(BlindingBits > 0 && rng.is_seeded()) {
+            std::cout << "   BlindedScalarBits ctor: using blinding bits = " << BlindingBits << "\n";
             constexpr size_t MaskWords = (BlindingBits + WordInfo<W>::bits - 1) / WordInfo<W>::bits;
             constexpr size_t MaskBytes = MaskWords * WordInfo<W>::bytes;
 
@@ -1341,6 +1355,7 @@ class BlindedScalarBits final {
             m_bytes = store_be<std::vector<uint8_t>>(mask_n);
             m_bits = C::Scalar::BITS + BlindingBits;
          } else {
+            std::cout << "   BlindedScalarBits ctor: skipping blinding\n";
             // No RNG available, skip blinding
             m_bytes.resize(C::Scalar::BYTES);
             scalar.serialize_to(std::span{m_bytes}.template first<C::Scalar::BYTES>());

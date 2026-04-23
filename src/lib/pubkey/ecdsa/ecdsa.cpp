@@ -8,11 +8,13 @@
 * Botan is released under the Simplified BSD License (see license.txt)
 */
 
+#include "botan/hex.h"
 #include <botan/ecdsa.h>
 
 #include <botan/ec_group.h>
 #include <botan/internal/keypair.h>
 #include <botan/internal/pk_ops_impl.h>
+#include <iostream>
 
 #if defined(BOTAN_HAS_RFC6979_GENERATOR)
    #include <botan/internal/rfc6979.h>
@@ -169,7 +171,9 @@ std::vector<uint8_t> ECDSA_Signature_Operation::raw_sign(std::span<const uint8_t
    const auto k = EC_Scalar::random(m_group, rng);
 #endif
 
+   std::cout << " before gk_x_mod_order, k = " << Botan::hex_encode(k.serialize()) << "\n";
    const auto r = EC_Scalar::gk_x_mod_order(k, rng);
+   std::cout << " after gk_x_mod_order\n";
 
    /*
    * Blind the inputs
@@ -190,7 +194,11 @@ std::vector<uint8_t> ECDSA_Signature_Operation::raw_sign(std::span<const uint8_t
    * [1] But note that such attacks are currently outside of Botan's threat model.
    *
    */
-   const auto k_inv = (m_b * k).invert();
+
+   const auto k_inv_pending = (m_b * k);
+   std::cout << " before inversion of b*k\n";
+   const auto k_inv = k_inv_pending.invert();
+   std::cout << " after inversion of b*k\n";
 
    const auto xr_m = ((m_x * m_b) * r) + (m * m_b);
 
