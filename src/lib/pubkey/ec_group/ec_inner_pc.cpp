@@ -125,7 +125,10 @@ secure_vector<uint8_t> EC_AffinePoint_Data_PC::mul_x_only(const EC_Scalar_Data& 
                                                           RandomNumberGenerator& rng) const {
    BOTAN_ARG_CHECK(scalar.group() == m_group, "Curve mismatch");
    const auto& k = EC_Scalar_Data_PC::checked_ref(scalar).value();
-   return m_group->pcurve().mul_x_only(m_pt, k, rng);
+   std::cout << "   EC_AffinePoint_Data_PC::mul_x_only() before pcurve mul\n";
+   auto result = m_group->pcurve().mul_x_only(m_pt, k, rng);
+   std::cout << "   EC_AffinePoint_Data_PC::mul_x_only() after pcurve mul\n";
+   return result;
 }
 
 size_t EC_AffinePoint_Data_PC::field_element_bytes() const {

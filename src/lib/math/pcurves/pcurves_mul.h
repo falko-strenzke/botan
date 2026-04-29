@@ -165,6 +165,7 @@ class AffinePointTable final {
 */
 template <typename C, size_t WindowBits>
 std::vector<typename C::AffinePoint> basemul_setup(const typename C::AffinePoint& p, size_t max_scalar_bits) {
+   std::cout << "   AffinePointTable::basemul_setup() started" << std::endl;
    static_assert(WindowBits >= 1 && WindowBits <= 8);
 
    // 2^W elements, less the identity element
@@ -195,6 +196,7 @@ std::vector<typename C::AffinePoint> basemul_setup(const typename C::AffinePoint
    }
 
    // Variable time batch conversion is fine since generator is public
+   std::cout << "   AffinePointTable::basemul_setup() ending (still performing to_affine_batch())" << std::endl;
    return to_affine_batch<C, true>(table);
 }
 
@@ -254,6 +256,8 @@ typename C::ProjectivePoint basemul_exec(std::span<const typename C::AffinePoint
 */
 template <typename C, size_t WindowBits>
 std::vector<typename C::AffinePoint> basemul_booth_setup(const typename C::AffinePoint& p, size_t max_scalar_bits) {
+   std::cout << "   AffinePointTable::basemul_booth_setup() started" << std::endl;
+
    static_assert(WindowBits >= 1 && WindowBits <= 8);
 
    // 2^(W-1) elements per window [1*base .. 2^(W-1)*base]
@@ -286,6 +290,7 @@ std::vector<typename C::AffinePoint> basemul_booth_setup(const typename C::Affin
    }
 
    // Variable time batch conversion is fine since generator is public
+   std::cout << "   AffinePointTable::basemul_booth_setup() ending (still performing to_affine_batch())" << std::endl;
    return to_affine_batch<C, true>(table);
 }
 
@@ -308,7 +313,7 @@ template <typename C, size_t WindowBits, typename BlindedScalar>
 typename C::ProjectivePoint basemul_booth_exec(std::span<const typename C::AffinePoint> table,
                                                const BlindedScalar& scalar,
                                                RandomNumberGenerator& rng) {
-   std::cout << "   basemul_booth_exec() started\n";
+   std::cout << "   basemul_booth_exec() started, WindowBits = " << WindowBits << "\n";
    static constexpr size_t WindowElements = 1 << (WindowBits - 1);
 
    const size_t windows = (scalar.bits() + WindowBits) / WindowBits;

@@ -1486,7 +1486,9 @@ secure_vector<uint8_t> GenericPrimeOrderCurve::mul_x_only(const AffinePoint& pt,
                                                           const Scalar& scalar,
                                                           RandomNumberGenerator& rng) const {
    GenericWindowedMul pt_table(from_stash(pt));
+   std::cout << "GenericPrimeOrderCurve::mul_x_only() before pt_table.mul()\n";
    auto pt_s = pt_table.mul(from_stash(scalar), rng);
+   std::cout << "GenericPrimeOrderCurve::mul_x_only() after pt_table.mul()\n";
    return to_affine_x<GenericCurve>(pt_s).serialize<secure_vector<uint8_t>>();
 }
 

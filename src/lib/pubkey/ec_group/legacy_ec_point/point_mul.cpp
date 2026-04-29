@@ -12,6 +12,7 @@
 #include <botan/internal/barrett.h>
 #include <botan/internal/ct_utils.h>
 #include <botan/internal/rounding.h>
+#include <iostream>
 
 namespace Botan {
 
@@ -44,6 +45,9 @@ EC_Point_Base_Point_Precompute::EC_Point_Base_Point_Precompute(const EC_Point& b
    std::vector<BigInt> ws(EC_Point::WORKSPACE_SIZE);
 
    const size_t order_bits = mod_order.modulus_bits();
+
+   std::cout << " EC_Point_Base_Point_Precompute::EC_Point_Base_Point_Precompute(): WindowBits = " << WindowBits
+             << std::endl;
 
    const size_t T_bits = round_up(order_bits + blinding_size(order_bits), WindowBits) / WindowBits;
 
@@ -91,6 +95,8 @@ EC_Point EC_Point_Base_Point_Precompute::mul(const BigInt& k,
    if(k.is_negative()) {
       throw Invalid_Argument("EC_Point_Base_Point_Precompute scalar must be positive");
    }
+
+   std::cout << "   EC_Point EC_Point_Base_Point_Precompute::mul() called for scalar " << k << std::endl;
 
    // Instead of reducing k mod group order should we alter the mask size??
    BigInt scalar = m_mod_order.reduce(k);
@@ -182,6 +188,8 @@ EC_Point_Var_Point_Precompute::EC_Point_Var_Point_Precompute(const EC_Point& ipo
    auto point = ipoint;
    point.randomize_repr(rng);
 
+   std::cout << "EC_Point_Var_Point_Precompute::EC_Point_Var_Point_Precompute(): WindowBits = " << WindowBits << "\n";
+
    std::vector<EC_Point> U(static_cast<size_t>(1) << WindowBits);
    U[0] = point.zero();
    U[1] = point;
@@ -214,6 +222,7 @@ EC_Point EC_Point_Var_Point_Precompute::mul(const BigInt& k,
                                             RandomNumberGenerator& rng,
                                             const BigInt& group_order,
                                             std::vector<BigInt>& ws) const {
+   std::cout << "   EC_Point_Var_Point_Precompute::mul() called for scalar " << k << std::endl;
    if(k.is_negative()) {
       throw Invalid_Argument("EC_Point_Var_Point_Precompute scalar must be positive");
    }

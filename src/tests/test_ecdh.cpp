@@ -4,7 +4,9 @@
 * Botan is released under the Simplified BSD License (see license.txt)
 */
 
+#include "botan/exceptn.h"
 #include "tests.h"
+#include <iostream>
 
 #if defined(BOTAN_HAS_ECDH)
    #include "test_pubkey.h"
@@ -94,6 +96,25 @@ class ECDH_AllGroups_Tests : public Test {
                   const auto a_ss = ka.derive_key(0, sec1_infinity);
                });
 
+               // Regression test: prohibit loading a point not on the curve
+               result.test_throws<Botan::Decoding_Error>("point is not on curve", [&] {
+                  const auto& base_point = group.get_base_point();
+                  auto x = base_point.get_affine_x();
+                  auto y = base_point.get_affine_y();
+                  std::vector<uint8_t> x_enc = x.serialize();
+                  std::vector<uint8_t> y_enc = x.serialize();
+                  if(x_enc.size() != y_enc.size()) {
+                     throw Botan_Tests::Test_Error("ECC coordinate size error");
+                  }
+
+                  std::vector<uint8_t> encoded({0x04});
+                  encoded.insert(encoded.end(), x_enc.begin(), x_enc.end());
+                  encoded.insert(encoded.end(), y_enc.begin(), y_enc.end());
+                  encoded[3] -= 1;
+
+                  const Botan::EC_AffinePoint false_point(group, encoded);
+               });
+
                for(size_t i = 0; i != 100; ++i) {
                   const Botan::ECDH_PrivateKey a_priv(rng(), group);
                   const auto a_pub = a_priv.public_value();
@@ -102,7 +123,9 @@ class ECDH_AllGroups_Tests : public Test {
                   const auto b_pub = b_priv.public_value();
 
                   const Botan::PK_Key_Agreement a_ka(a_priv, rng(), kdf);
+                  std::cout << "ECDH Test: before derive_key for " << group_name << std::endl;
                   const auto a_ss = a_ka.derive_key(0, b_pub);
+                  std::cout << "ECDH Test: after derive_key for " << group_name << std::endl;
 
                   const Botan::PK_Key_Agreement b_ka(b_priv, rng(), kdf);
                   const auto b_ss = b_ka.derive_key(0, a_pub);

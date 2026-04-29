@@ -537,7 +537,11 @@ class IntMod final {
       * chain for specific inversions (see for example pcurves_secp256r1.cpp)
       */
       constexpr Self invert() const {
-         std::cout << "   IntMod::invert: calling pow_vartime()\n";
+         std::vector<uint8_t> dbg(Self::BYTES);
+         std::span<uint8_t, Self::BYTES> s_dbg(dbg.begin(), dbg.end());
+         serialize_to(s_dbg);
+         std::cout << "   IntMod::invert: calling pow_vartime(Self::P_MINUS_2) for value = " << hex_encode(s_dbg)
+                   << "\n";
          return pow_vartime(Self::P_MINUS_2);
       }
 
@@ -1502,6 +1506,7 @@ class WindowedBoothMulTable final {
       explicit WindowedBoothMulTable(const AffinePoint& p) : m_table(varpoint_setup<C, TableSize>(p)) {}
 
       ProjectivePoint mul(const Scalar& s, RandomNumberGenerator& rng) const {
+         std::cout << "   WindowedBoothMulTable::mul() starting\n";
          const BlindedScalar bits(s, rng);
 
          const size_t scalar_bits = bits.bits();
@@ -1542,6 +1547,7 @@ class WindowedBoothMulTable final {
          accum = ProjectivePoint::add_or_sub(accum, m_table.ct_select(tidx), tneg);
 
          CT::unpoison(accum);
+         std::cout << "   WindowedBoothMulTable::mul() ending\n";
          return accum;
       }
 

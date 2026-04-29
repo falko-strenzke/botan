@@ -196,7 +196,7 @@ std::vector<uint8_t> ECDSA_Signature_Operation::raw_sign(std::span<const uint8_t
    */
 
    const auto k_inv_pending = (m_b * k);
-   std::cout << " before inversion of b*k\n";
+   std::cout << " before inversion of b*k = " << hex_encode(k_inv_pending.serialize()) << "\n";
    const auto k_inv = k_inv_pending.invert();
    std::cout << " after inversion of b*k\n";
 

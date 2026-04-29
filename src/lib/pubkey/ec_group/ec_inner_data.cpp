@@ -327,16 +327,20 @@ std::unique_ptr<EC_Scalar_Data> EC_Group_Data::gk_x_mod_order(const EC_Scalar_Da
                                                               RandomNumberGenerator& rng) const {
    if(m_pcurve) {
       const auto& k = EC_Scalar_Data_PC::checked_ref(scalar);
-      std::cout << "  EC_Group_Data::gk_x_mod_order() before calling m_pcurve->base_point_mul_x_mod_order()\n";
+      std::cout
+         << "  EC_Group_Data::gk_x_mod_order() for pcurve before calling m_pcurve->base_point_mul_x_mod_order()\n";
       auto gk_x_mod_order = m_pcurve->base_point_mul_x_mod_order(k.value(), rng);
-      std::cout << "  EC_Group_Data::gk_x_mod_order() after calling m_pcurve->base_point_mul_x_mod_order()\n";
+      std::cout
+         << "  EC_Group_Data::gk_x_mod_order() for pcurve after calling m_pcurve->base_point_mul_x_mod_order()\n";
       return std::make_unique<EC_Scalar_Data_PC>(shared_from_this(), gk_x_mod_order);
    } else {
 #if defined(BOTAN_HAS_LEGACY_EC_POINT)
       const auto& k = EC_Scalar_Data_BN::checked_ref(scalar);
       BOTAN_STATE_CHECK(m_base_mult != nullptr);
       std::vector<BigInt> ws;
+      std::cout << "  EC_Group_Data::gk_x_mod_order() for legacy point beforem_base_mult->mul()\n";
       const auto pt = m_base_mult->mul(k.value(), rng, m_order, ws);
+      std::cout << "  EC_Group_Data::gk_x_mod_order() for legacy point beforem_base_mult->mul()\n";
 
       if(pt.is_zero()) {
          return std::make_unique<EC_Scalar_Data_BN>(shared_from_this(), BigInt::zero());

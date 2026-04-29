@@ -12,6 +12,7 @@
 #include <botan/bigint.h>
 #include <botan/ec_group.h>
 #include <botan/internal/pk_ops_impl.h>
+#include <iostream>
 
 namespace Botan {
 
@@ -60,8 +61,10 @@ class ECDH_KA_Operation final : public PK_Ops::Key_Agreement_with_KDF {
          if(input_point.is_identity()) {
             throw Decoding_Error("ECDH - Invalid elliptic curve point: identity");
          }
-
-         return input_point.mul_x_only(m_l_times_priv, m_rng);
+         std::cout << "ECDH_KA_Operation::raw_agree(): before point mul\n";
+         auto result = input_point.mul_x_only(m_l_times_priv, m_rng);
+         std::cout << "ECDH_KA_Operation::raw_agree(): after point mul\n";
+         return result;
       }
 
    private:
