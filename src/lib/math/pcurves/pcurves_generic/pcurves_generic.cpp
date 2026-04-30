@@ -934,7 +934,9 @@ class GenericField final {
 */
 class GenericAffinePoint final {
    public:
-      GenericAffinePoint(const GenericField& x, const GenericField& y) : m_x(x), m_y(y) {}
+      GenericAffinePoint(const GenericField& x, const GenericField& y) : m_x(x), m_y(y) {
+         std::cout << "GenericAffinePoint::ctor(x,y) without point-on-curve check\n";
+      }
 
       explicit GenericAffinePoint(const GenericPrimeOrderCurve* curve) :
             m_x(GenericField::zero(curve)), m_y(GenericField::zero(curve)) {}
@@ -1006,8 +1008,12 @@ class GenericAffinePoint final {
             if(x && y) {
                const auto lhs = (*y).square();
                const auto rhs = GenericAffinePoint::x3_ax_b(*x);
+               std::cout << "GenericAffinePoint::deserialize() before point on curve check\n";
                if((lhs == rhs).as_bool()) {
+                  std::cout << "GenericAffinePoint::deserialize() after point on curve check (success)\n";
                   return GenericAffinePoint(*x, *y);
+               } else {
+                  std::cout << "GenericAffinePoint::deserialize() after point on curve check (FAILURE)\n";
                }
             }
          } else if(bytes.size() == 1 + fe_bytes && (bytes[0] == 0x02 || bytes[0] == 0x03)) {

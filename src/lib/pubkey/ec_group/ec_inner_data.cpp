@@ -382,6 +382,7 @@ std::unique_ptr<EC_Scalar_Data> EC_Group_Data::scalar_deserialize(std::span<cons
 std::unique_ptr<EC_AffinePoint_Data> EC_Group_Data::point_deserialize(std::span<const uint8_t> bytes) const {
    // The deprecated "hybrid" point format
    // TODO(Botan4) remove this
+   std::cout << "   EC_Group_Data::point_deserialize() starting\n";
    if(bytes.size() >= 1 + 2 * 4 && (bytes[0] == 0x06 || bytes[0] == 0x07)) {
       const bool hdr_y_is_even = bytes[0] == 0x06;
       const bool y_is_even = (bytes.back() & 0x01) == 0;
@@ -401,17 +402,21 @@ std::unique_ptr<EC_AffinePoint_Data> EC_Group_Data::point_deserialize(std::span<
                << "   EC_Group_Data::point_deserialize() returning EC_AffinePoint_Data_PC>(shared_from_this(), std::move(*pt))\n";
             return std::make_unique<EC_AffinePoint_Data_PC>(shared_from_this(), std::move(*pt));
          } else {
+            std::cout << "   EC_Group_Data::point_deserialize() returning NONE\n";
             return {};
          }
       } else {
 #if defined(BOTAN_HAS_LEGACY_EC_POINT)
          auto pt = Botan::OS2ECP(bytes, m_curve);
+         std::cout
+            << "   EC_Group_Data::point_deserialize(): LEGACY_EC_POINT: returning EC_AffinePoint_Data_PC>(shared_from_this(), std::move(pt))\n";
          return std::make_unique<EC_AffinePoint_Data_BN>(shared_from_this(), std::move(pt));
 #else
          throw Not_Implemented("Legacy EC interfaces disabled in this build configuration");
 #endif
       }
    } catch(...) {
+      std::cout << "   EC_Group_Data::point_deserialize() returning NONE (due to exception)\n";
       return {};
    }
 }
