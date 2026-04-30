@@ -518,6 +518,7 @@ class GenericScalar final {
       }
 
       void serialize_to(std::span<uint8_t> bytes) const {
+         std::cout << "GenericScalar: serialize_to() called\n";
          auto v = from_rep(m_curve, m_val);
          std::reverse(v.begin(), v.end());
 
@@ -778,6 +779,7 @@ class GenericField final {
       }
 
       void serialize_to(std::span<uint8_t> bytes) const {
+         std::cout << "GenericField::serialize_to() called\n";
          auto v = from_rep(m_curve, m_val);
          std::reverse(v.begin(), v.end());
 
@@ -951,6 +953,7 @@ class GenericAffinePoint final {
       * Serialize the point in uncompressed format
       */
       void serialize_to(std::span<uint8_t> bytes) const {
+         std::cout << "GenericAffinePoint::serialize_to() called\n";
          const size_t fe_bytes = curve()->_params().field_bytes();
          BOTAN_ARG_CHECK(bytes.size() == 1 + 2 * fe_bytes, "Buffer size incorrect");
          BOTAN_STATE_CHECK(this->is_identity().as_bool() == false);

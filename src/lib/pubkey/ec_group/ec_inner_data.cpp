@@ -389,6 +389,7 @@ std::unique_ptr<EC_AffinePoint_Data> EC_Group_Data::point_deserialize(std::span<
       if(hdr_y_is_even == y_is_even) {
          std::vector<uint8_t> sec1(bytes.begin(), bytes.end());
          sec1[0] = 0x04;
+         std::cout << "   EC_Group_Data::point_deserialize() returning this->point_deserialize(sec1)\n";
          return this->point_deserialize(sec1);
       }
    }
@@ -396,6 +397,8 @@ std::unique_ptr<EC_AffinePoint_Data> EC_Group_Data::point_deserialize(std::span<
    try {
       if(m_pcurve) {
          if(auto pt = m_pcurve->deserialize_point(bytes)) {
+            std::cout
+               << "   EC_Group_Data::point_deserialize() returning EC_AffinePoint_Data_PC>(shared_from_this(), std::move(*pt))\n";
             return std::make_unique<EC_AffinePoint_Data_PC>(shared_from_this(), std::move(*pt));
          } else {
             return {};

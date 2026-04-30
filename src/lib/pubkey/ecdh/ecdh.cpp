@@ -45,9 +45,12 @@ class ECDH_KA_Operation final : public PK_Ops::Key_Agreement_with_KDF {
                   "Support for DH with cofactor adjustment not available in this build configuration");
 #endif
             } else {
+               std::cout << "ECDH_KA_Operation::raw_agree(): before deserialize public point\n";
                if(auto point = EC_AffinePoint::deserialize(m_group, {w, w_len})) {
+                  std::cout << "ECDH_KA_Operation::raw_agree(): after deserialize public point (success)\n";
                   return *point;
                } else {
+                  std::cout << "ECDH_KA_Operation::raw_agree(): after deserialize public point (failure)\n";
                   throw Decoding_Error("ECDH - Invalid elliptic curve point: not on curve");
                }
             }

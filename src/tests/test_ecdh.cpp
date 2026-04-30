@@ -112,7 +112,13 @@ class ECDH_AllGroups_Tests : public Test {
                   encoded.insert(encoded.end(), y_enc.begin(), y_enc.end());
                   encoded[3] -= 1;
 
-                  const Botan::EC_AffinePoint false_point(group, encoded);
+                  const Botan::ECDH_PrivateKey a_priv(rng(), group);
+                  const auto a_pub = a_priv.public_value();
+                  const Botan::PK_Key_Agreement a_ka(a_priv, rng(), kdf);
+                  std::cout << "ECDH Test: before KA derive_key with invalid point. group = " << group_name
+                            << std::endl;
+                  const auto a_ss = a_ka.derive_key(0, encoded);
+                  std::cout << "ECDH Test: after KA derive_key with invalid point. group = " << group_name << std::endl;
                });
 
                for(size_t i = 0; i != 100; ++i) {
@@ -122,7 +128,9 @@ class ECDH_AllGroups_Tests : public Test {
                   const Botan::ECDH_PrivateKey b_priv(rng(), group);
                   const auto b_pub = b_priv.public_value();
 
+                  std::cout << "ECDH Test: before Botan::PK_Key_Agreement a_ka for " << group_name << std::endl;
                   const Botan::PK_Key_Agreement a_ka(a_priv, rng(), kdf);
+                  std::cout << "ECDH Test: after Botan::PK_Key_Agreement a_ka for " << group_name << std::endl;
                   std::cout << "ECDH Test: before derive_key for " << group_name << std::endl;
                   const auto a_ss = a_ka.derive_key(0, b_pub);
                   std::cout << "ECDH Test: after derive_key for " << group_name << std::endl;

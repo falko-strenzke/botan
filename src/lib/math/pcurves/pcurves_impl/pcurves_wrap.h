@@ -265,10 +265,14 @@ class PrimeOrderCurveImpl final : public PrimeOrderCurve {
                const auto rhs = C::x3_ax_b(*x);
                const auto valid = (lhs == rhs);
                if(valid.as_bool()) {
+                  std::cout << "   PrimeOrderCurveImpl::serialize_scalar: point on curve check successful\n";
                   return stash(typename C::AffinePoint(*x, *y));
+               } else {
+                  std::cout << "   PrimeOrderCurveImpl::serialize_scalar: point on curve check FAILED\n";
                }
             }
          } else if(bytes.size() == CompressedBytes && (bytes[0] == 0x02 || bytes[0] == 0x03)) {
+            std::cout << "   PrimeOrderCurveImpl::serialize_scalar: point is compressed\n";
             const CT::Choice y_is_even = CT::Mask<uint8_t>::is_equal(bytes[0], 0x02).as_choice();
 
             if(auto x = C::FieldElement::deserialize(bytes.subspan(1, FieldElementBytes))) {
