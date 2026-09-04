@@ -1,6 +1,7 @@
 all-leaf-san-names-enforced-invalid:Certificate does not pass name constraint
 constraints-intersection-empty-invalid:Certificate does not pass name constraint
-critical-aia-intermediate-invalid:Certificate extension encoding error
+# PolicyConstraints is not implemented, so any critical instance is rejected regardless of content
+critical-policy-constraints-unsupported-invalid:Unknown critical extension encountered
 cross-type-permit-lower-applies-to-leaf-invalid:Certificate does not pass name constraint
 different-name-type-constraints-compose-valid:Verified
 directory-name-attribute-type-mismatch-invalid:Certificate does not pass name constraint
@@ -51,7 +52,6 @@ dns-constraint-trailing-dot-invalid:Certificate extension encoding error
 dns-constraint-with-underscore-invalid:Certificate extension encoding error
 dns-constraint-with-wildcard-invalid:Certificate extension encoding error
 dns-double-dot-san-invalid:Certificate extension encoding error
-dns-empty-san-and-excluded-constraint-invalid:Certificate extension encoding error
 dns-empty-san-invalid:Certificate extension encoding error
 dns-excluded-mixed-case-cn-invalid:Certificate does not pass name constraint
 dns-excluded-not-prefix-valid:Verified
@@ -63,6 +63,8 @@ dns-leading-dot-apex-invalid:Certificate does not pass name constraint
 dns-leading-dot-excluded-apex-valid:Verified
 dns-leading-dot-subdomain-valid:Verified
 dns-leading-empty-label-invalid:Certificate extension encoding error
+# 12 SANs x 12 constraints is far below the complexity limit; see x509_name_constraint_complexity_limit
+dns-many-sans-one-excluded-invalid:Certificate does not pass name constraint
 dns-multiple-excluded-disjoint-first-invalid:Certificate does not pass name constraint
 dns-multiple-excluded-disjoint-second-invalid:Certificate does not pass name constraint
 dns-multiple-permitted-disjoint-valid:Verified
@@ -75,7 +77,8 @@ dns-san-present-cn-outside-valid:Verified
 dns-san-trailing-dot-invalid:Certificate extension encoding error
 dns-space-san-invalid:Certificate extension encoding error
 dns-wildcard-san-tld-constraint-valid:Verified
-dns-wildcard-tld-san-deep-constraint-invalid:Certificate extension encoding error
+# A wildcard SAN with fewer than three labels (*.com) is rejected when decoding the SAN
+dns-wildcard-tld-san-invalid:Certificate extension encoding error
 edi-party-name-constraint-rejected:Certificate does not pass name constraint
 email-constraint-leading-at-invalid:Certificate extension encoding error
 email-constraint-mailbox-with-leading-dot-host-invalid:Certificate extension encoding error
@@ -109,8 +112,10 @@ email-quoted-localpart-not-equal-invalid:Certificate extension encoding error
 email-quoted-localpart-smuggle-at-bypass-invalid:Certificate extension encoding error
 email-rfc822-and-smtputf8-san-mixed-invalid:Certificate does not pass name constraint
 email-san-no-at-invalid:Certificate extension encoding error
+# Rejected because the AIA is empty (SIZE (1..MAX)), not because it is critical
+empty-aia-intermediate-invalid:Certificate extension encoding error
 empty-dns-excluded-rejects-everything-invalid:Certificate extension encoding error
-empty-dns-permitted-allows-anything-valid:Certificate extension encoding error
+empty-dns-permitted-allows-anything-invalid:Certificate extension encoding error
 empty-email-excluded-rejects-everything-invalid:Certificate extension encoding error
 empty-email-permitted-allows-anything-invalid:Certificate extension encoding error
 empty-name-constraints-extension-invalid:Certificate extension encoding error
@@ -121,9 +126,11 @@ empty-uri-excluded-rejects-everything-invalid:Certificate extension encoding err
 empty-uri-permitted-allows-anything-invalid:Certificate extension encoding error
 excluded-only-upper-permits-only-lower-leaf-outside-invalid:Certificate does not pass name constraint
 excluded-union-across-cas-invalid:Certificate does not pass name constraint
-general-name-context-class-mismatch-invalid:Certificate does not pass name constraint
+general-name-context-class-mismatch-invalid:Certificate extension encoding error
 general-name-empty-context-tag-invalid:Certificate extension encoding error
-general-name-tag-out-of-range-invalid:Certificate does not pass name constraint
+general-name-tag-out-of-range-invalid:Certificate extension encoding error
+# permittedSubtrees contains a single GeneralSubtree without a base GeneralName
+general-subtree-missing-base-invalid:Certificate extension encoding error
 general-subtree-with-extra-fields-invalid:Certificate extension encoding error
 ia5-locale-independent-case-valid:Verified
 intermediate-narrows-ip-exclusion-invalid:Certificate does not pass name constraint
@@ -144,17 +151,17 @@ ip-mixed-v4-v6-leaf-v6-outside-root-permit-invalid:Certificate does not pass nam
 ip-multiple-excluded-disjoint-inside-invalid:Certificate does not pass name constraint
 ip-multiple-excluded-disjoint-outside-valid:Verified
 ip-multiple-permitted-disjoint-valid:Verified
+# The iPAddress base is wrapped in an extra SEQUENCE. A correctly encoded 4 byte
+# iPAddress constraint is covered by the x509_name_constraint_malformed_encoding test
+ip-name-constraint-nested-sequence-invalid:Certificate extension encoding error
 ip-name-constraint-non-contiguous-mask-invalid:Certificate extension encoding error
-ip-name-constraint-wrong-length-invalid:Certificate does not pass name constraint
 ip-permit-all-zeros-mask-catch-all-valid:Verified
 ip-san-with-mask-bytes-invalid:Certificate extension encoding error
 ip-san-wrong-length-invalid:Certificate extension encoding error
 ipv4-catch-all-excluded-invalid:Certificate does not pass name constraint
 ipv4-mapped-ipv6-excl-does-not-affect-ipv4-valid:Verified
-ipv4-mapped-ipv6-not-in-v4-exclude-valid:Verified
 ipv4-mapped-ipv6-rejected-from-v4-permit-invalid:Certificate does not pass name constraint
 ipv4-name-constraint-non-canonical-cidr-valid:Verified
-ipv4-name-constraint-noncontiguous-mask-invalid:Certificate extension encoding error
 ipv4-only-permit-ipv6-san-invalid:Certificate does not pass name constraint
 ipv6-catch-all-exclude-does-not-block-ipv4-valid:Verified
 ipv6-excluded-inside-invalid:Certificate does not pass name constraint
@@ -162,9 +169,9 @@ ipv6-excluded-outside-valid:Verified
 ipv6-only-permit-ipv4-san-invalid:Certificate does not pass name constraint
 ipv6-permitted-outside-invalid:Certificate does not pass name constraint
 ipv6-permitted-valid:Verified
+ipv6-san-unaffected-by-v4-exclude-valid:Verified
 issuer-alt-name-outside-dns-permit-valid:Verified
 issuer-name-mismatch-invalid:Certificate issuer not found
-malformed-policy-constraints-invalid:Unknown critical extension encountered
 multi-ca-excluded-at-leaf-issuer-invalid:Certificate does not pass name constraint
 multi-ca-permit-and-exclude-overlap-invalid:Certificate does not pass name constraint
 multi-ca-permit-for-unused-name-form-valid:Verified
@@ -179,14 +186,15 @@ name-constraints-duplicate-permitted-valid:Verified
 name-constraints-explicit-minimum-zero-valid:Verified
 name-constraints-extension-in-leaf-invalid:Certificate does not pass name constraint
 name-constraints-many-excluded-many-sans-under-limit-valid:Verified
-name-constraints-many-names-complexity:Certificate does not pass name constraint
 name-constraints-many-permitted-equivalent-valid:Verified
-name-constraints-maximum-present-invalid:Certificate does not pass name constraint
+# The GeneralSubtree is wrapped in an extra SEQUENCE, so the maximum field is never
+# reached. A correctly encoded maximum is covered by x509_name_constraint_malformed_encoding
+name-constraints-maximum-present-nested-sequence-invalid:Certificate extension encoding error
 name-constraints-minimum-nonzero-invalid:Certificate extension encoding error
 name-constraints-noncritical-valid:Verified
 name-constraints-permit-and-exclude-same-name-invalid:Certificate does not pass name constraint
 name-form-absent-valid:Verified
-nc-permitted-subtrees-explicit-tag-invalid:Certificate does not pass name constraint
+nc-permitted-subtrees-explicit-tag-invalid:Certificate extension encoding error
 non-ca-issuer-invalid:CA certificate not allowed to issue certs
 non-hostname-cn-no-san-excluded-dns-valid:Verified
 non-hostname-cn-no-san-permitted-dns-valid:Verified
@@ -200,13 +208,13 @@ othername-san-without-constraint-valid:Verified
 othername-smtputf8-constraint-rejected:Certificate does not pass name constraint
 othername-unsupported-constraint-rejected:Certificate does not pass name constraint
 permitted-intersection-narrows-valid:Verified
-permitted-subtrees-empty-invalid:Certificate does not pass name constraint
 permitted-wildcard-match-valid:Verified
 policy-invalid-leaf-extension-invalid:Certificate extension encoding error
 registered-id-critical-constraint:Certificate does not pass name constraint
 registered-id-excluded-critical-constraint:Certificate does not pass name constraint
 rfc3779-asidentifiers-malformed-invalid:Certificate extension encoding error
-rfc3779-ipaddrblocks-malformed-invalid:IP Address Blocks extension invalid
+# The (empty) IPAddrBlocks decodes fine; RFC 3779 requires the issuer to carry the extension too
+rfc3779-ipaddrblocks-issuer-lacks-extension-invalid:IP Address Blocks extension invalid
 san-rfc822-and-smtputf8-both-permitted-valid:Verified
 san-rfc822-pass-smtputf8-fail-invalid:Certificate does not pass name constraint
 self-constraint-not-applied-to-issuing-ca-valid:Verified
@@ -229,14 +237,28 @@ smtp-utf8-san-excluded-mailbox-diff-domain-valid:Verified
 smtp-utf8-san-excluded-mailbox-diff-local-invalid:Certificate does not pass name constraint
 smtp-utf8-san-excluded-mailbox-exact-invalid:Certificate does not pass name constraint
 smtp-utf8-san-excluded-subtree-invalid:Certificate does not pass name constraint
-# Valid under the rules of RFC 8393, and explicitly invalid under RFC 9598
+# Valid under the rules of RFC 8398, and explicitly invalid under RFC 9598
 smtp-utf8-ulabel-domain-permit-valid:Certificate extension encoding error
 smtp-utf8-utf8-localpart-permit-valid:Verified
+# SRVName (RFC 4985) constraints are not implemented. An otherName constraint fails closed
+# whenever the certificate carries any otherName SAN, and is ignored otherwise
+srvname-case-insensitive-service-valid:Certificate does not pass name constraint
+srvname-dns-only-permit-outside-invalid:Certificate does not pass name constraint
+srvname-dns-only-permit-valid:Certificate does not pass name constraint
+srvname-excluded-service-invalid:Certificate does not pass name constraint
+srvname-full-permit-valid:Certificate does not pass name constraint
+srvname-full-permit-wrong-domain-invalid:Certificate does not pass name constraint
+srvname-full-permit-wrong-service-invalid:Certificate does not pass name constraint
+srvname-permit-no-srvname-san-valid:Verified
+srvname-service-only-permit-valid:Certificate does not pass name constraint
+srvname-service-only-permit-wrong-service-invalid:Certificate does not pass name constraint
 subject-email-ignored-when-san-present-valid:Verified
 subject-email-legacy-excluded-inside-invalid:Certificate does not pass name constraint
 subject-email-legacy-excluded-outside-valid:Verified
 subject-email-legacy-invalid:Certificate does not pass name constraint
 subject-email-legacy-valid:Verified
+# Valid per RFC 5280 (the attribute value is not a mailbox inside the excluded subtree)
+# but we reject any unparsable emailAddress attribute while an rfc822Name constraint is in force
 subject-email-no-san-excluded-malformed-attribute-valid:Certificate does not pass name constraint
 subject-email-no-san-malformed-attribute-invalid:Certificate does not pass name constraint
 subject-email-no-san-multiple-excluded-one-inside-invalid:Certificate does not pass name constraint
@@ -286,17 +308,14 @@ wildcard-cn-permit-miss-invalid:Certificate does not pass name constraint
 wildcard-excluded-case-insensitive-invalid:Certificate does not pass name constraint
 wildcard-excluded-cross-subtree-valid:Verified
 wildcard-excluded-far-inner-invalid:Certificate does not pass name constraint
-wildcard-excluded-far-outer-valid:Certificate extension encoding error
 wildcard-excluded-inner-invalid:Certificate does not pass name constraint
 wildcard-excluded-parent-invalid:Certificate does not pass name constraint
-wildcard-excluded-sibling-subtree-valid:Verified
 wildcard-excluded-single-label-tld-vs-unrelated-valid:Verified
 wildcard-excluded-single-label-valid:Verified
 wildcard-middle-label-san-invalid:Certificate extension encoding error
 wildcard-multi-label-san-invalid:Certificate extension encoding error
 wildcard-permitted-cross-subtree-invalid:Certificate does not pass name constraint
 wildcard-permitted-far-inner-valid:Verified
-wildcard-permitted-far-outer-too-broad-invalid:Certificate extension encoding error
 wildcard-permitted-inner-valid:Verified
 wildcard-permitted-inside-subtree-valid:Verified
 wildcard-permitted-outer-too-broad-invalid:Certificate does not pass name constraint

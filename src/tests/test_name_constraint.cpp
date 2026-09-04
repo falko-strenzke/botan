@@ -16,6 +16,9 @@
    #include <botan/x509_ext.h>
    #include <botan/x509cert.h>
    #include <botan/x509path.h>
+   #include <botan/x509self.h>
+   #include <botan/ecdsa.h>
+   #include <botan/ec_group.h>
    #include <botan/internal/calendar.h>
    #include <botan/internal/x509_utils.h>
    #include <algorithm>
@@ -752,6 +755,187 @@ class Name_Constraint_Corpus_Reencode_Tests final : public Test {
 };
 
 BOTAN_REGISTER_TEST("x509", "x509_name_constraint_corpus_reencode", Name_Constraint_Corpus_Reencode_Tests);
+
+/*
+* Malformed and unsupported GeneralSubtree / NameConstraints encodings.
+*
+* These are exercised with hand-rolled DER because the validation corpus
+* cannot carry them: the corpus root key is not available, so intermediates
+* with corrected encodings cannot be signed.
+*/
+class Name_Constraint_Malformed_Encoding_Tests final : public Test {
+   private:
+      struct SubtreeCase {
+            const char* label;
+            const char* der;
+            std::optional<Botan::GeneralName::NameType> expected;  // nullopt: must throw
+      };
+
+      static Test::Result test_general_subtree_encodings() {
+         Test::Result result("X509v3 Name Constraints: GeneralSubtree encodings");
+
+         using NT = Botan::GeneralName::NameType;
+         const std::vector<SubtreeCase> cases = {
+            // Well-formed, interpreted
+            {"dNSName", "300D820B6578616D706C652E636F6D", NT::DNS},
+            {"otherName", "300EA00C06032A0304A0050C03616263", NT::Other},
+            // Well-formed, retained as Unknown so critical constraints fail closed
+            {"x400Address", "3002A300", NT::Unknown},
+            {"ediPartyName", "3002A500", NT::Unknown},
+            {"registeredID", "300588032A0304", NT::Unknown},
+            // Malformed: rejected at decode
+            {"missing base", "3000", std::nullopt},
+            {"universal SEQUENCE as base", "300F300D820B6578616D706C652E636F6D", std::nullopt},
+            {"application class tag", "30024200", std::nullopt},
+            {"private class tag", "3002C200", std::nullopt},
+            {"tag [9] primitive", "30028900", std::nullopt},
+            {"tag [9] constructed", "3002A900", std::nullopt},
+            {"dNSName encoded constructed", "300DA20B6578616D706C652E636F6D", std::nullopt},
+            {"directoryName encoded primitive", "300484023000", std::nullopt},
+            {"empty dNSName", "30028200", std::nullopt},
+            {"iPAddress of 4 bytes (no mask)", "30068704C0000200", std::nullopt},
+            {"iPAddress of 16 bytes (no mask)", "3012871020010DB8000000000000000000000001", std::nullopt},
+            {"iPAddress of 12 bytes", "300E870CC0000200FFFFFF00C0000201", std::nullopt},
+            {"iPv4 non-contiguous mask", "300A8708C0000200FF00FF00", std::nullopt},
+            {"minimum present and nonzero", "3010820B6578616D706C652E636F6D800101", std::nullopt},
+            {"maximum present", "3010820B6578616D706C652E636F6D810101", std::nullopt},
+            {"trailing garbage in GeneralSubtree", "3010820B6578616D706C652E636F6D050000", std::nullopt},
+         };
+
+         for(const auto& c : cases) {
+            const auto der = Botan::hex_decode(c.der);
+            Botan::BER_Decoder dec(der, Botan::BER_Decoder::Limits::DER());
+            Botan::GeneralSubtree subtree;
+            try {
+               subtree.decode_from(dec);
+               if(c.expected.has_value()) {
+                  result.test_is_true(std::string("decoded ") + c.label, subtree.base().type_code() == *c.expected);
+               } else {
+                  result.test_failure(std::string("accepted malformed GeneralSubtree: ") + c.label);
+               }
+            } catch(const Botan::Decoding_Error& e) {
+               if(c.expected.has_value()) {
+                  result.test_failure(std::string("rejected valid GeneralSubtree: ") + c.label + ": " + e.what());
+               } else {
+                  result.test_success(std::string("rejected ") + c.label);
+               }
+            }
+         }
+
+         return result;
+      }
+
+      static const Botan::Cert_Extension::Name_Constraints* decode_nc(Botan::Extensions& parsed,
+                                                                      const std::vector<uint8_t>& body) {
+         std::vector<uint8_t> wire;
+         Botan::DER_Encoder enc(wire);
+         enc.start_sequence()
+            .start_sequence()
+            .encode(Botan::Cert_Extension::Name_Constraints::static_oid())
+            .encode(true)
+            .encode(body, Botan::ASN1_Type::OctetString)
+            .end_cons()
+            .end_cons();
+         Botan::BER_Decoder dec(wire);
+         parsed.decode_from(dec, Botan::Extension_Context::Certificate);
+         return parsed.get_extension_object_as<Botan::Cert_Extension::Name_Constraints>();
+      }
+
+      static Test::Result test_name_constraints_encodings() {
+         Test::Result result("X509v3 Name Constraints: extension body encodings");
+
+         // A NameConstraints body that fails to decode is retained as an
+         // Unknown_Extension, so the typed accessor returns null.
+         const std::vector<std::pair<const char*, const char*>> rejected = {
+            {"no subtrees at all", "3000"},
+            {"empty permittedSubtrees", "3002A000"},
+            {"empty excludedSubtrees", "3002A100"},
+            {"permittedSubtrees with a base-less GeneralSubtree", "3004A0023000"},
+            {"permittedSubtrees encoded EXPLICIT (extra SEQUENCE)", "3013A011300F300D820B6578616D706C652E636F6D"},
+            {"excludedSubtrees with maximum", "3014A1123010820B6578616D706C652E636F6D810101"},
+            {"excludedSubtrees with tag [9]", "3006A10430028900"},
+            {"iPAddress constraint of 4 bytes", "300AA008300687040A000000"},
+         };
+
+         for(const auto& [label, hex] : rejected) {
+            Botan::Extensions parsed;
+            const auto* nc = decode_nc(parsed, Botan::hex_decode(hex));
+            result.test_is_true(std::string("rejected ") + label, nc == nullptr);
+         }
+
+         Botan::Extensions parsed;
+         const auto* nc = decode_nc(parsed, Botan::hex_decode("3011A00F300D820B6578616D706C652E636F6D"));
+         if(result.test_not_null("accepted well-formed permittedSubtrees", nc)) {
+            result.test_sz_eq("one permitted subtree", nc->get_name_constraints().permitted().size(), 1);
+         }
+
+         return result;
+      }
+
+   public:
+      std::vector<Test::Result> run() override {
+         return {test_general_subtree_encodings(), test_name_constraints_encodings()};
+      }
+};
+
+BOTAN_REGISTER_TEST("x509", "x509_name_constraint_malformed_encoding", Name_Constraint_Malformed_Encoding_Tests);
+
+/*
+* The name constraint evaluation refuses certificates where
+* (#subject DN attributes + #SAN entries) * (#constraints) reaches 2^16,
+* independently for the permitted and the excluded list.
+*/
+class Name_Constraint_Complexity_Limit_Tests final : public Test {
+   public:
+      std::vector<Test::Result> run() override {
+         Test::Result result("X509v3 Name Constraints: complexity limit");
+
+         const Botan::ECDSA_PrivateKey key(rng(), Botan::EC_Group::from_name("secp256r1"));
+
+         Botan::X509_Cert_Options opts("Complexity Leaf/US/NC Tests/Testing");
+         opts.dns = "h0.example.com";
+         for(size_t i = 1; i < 300; ++i) {
+            opts.more_dns.push_back("h" + std::to_string(i) + ".example.com");
+         }
+         const auto cert = Botan::X509::create_self_signed_cert(opts, key, "SHA-256", rng());
+
+         const size_t names = cert.subject_dn().count() + cert.subject_alt_name().count();
+         result.test_sz_gte("certificate carries many names", names, 300);
+
+         constexpr size_t limit = size_t(1) << 16;
+         const size_t over = (limit + names - 1) / names;  // names * over >= limit
+         const size_t under = over - 1;                    // names * under < limit
+         result.test_is_true("limit arithmetic", names * over >= limit && names * under < limit);
+
+         auto subtrees = [](size_t count, const std::string& name) {
+            std::vector<Botan::GeneralSubtree> out;
+            for(size_t i = 0; i < count; ++i) {
+               const std::string nm = (name.find("{}") == std::string::npos)
+                                         ? name
+                                         : name.substr(0, name.find("{}")) + std::to_string(i) +
+                                              name.substr(name.find("{}") + 2);
+               out.emplace_back(Botan::GeneralName::dns(nm));
+            }
+            return out;
+         };
+
+         // Every SAN is inside example.com: permitted unless the limit trips
+         const Botan::NameConstraints permit_under(subtrees(under, "example.com"), {});
+         const Botan::NameConstraints permit_over(subtrees(over, "example.com"), {});
+         result.test_is_true("permitted below the limit", permit_under.is_permitted(cert, true));
+         result.test_is_false("not permitted at the limit", permit_over.is_permitted(cert, true));
+
+         // No SAN is inside any evilN.example.net: excluded only when the limit trips
+         const Botan::NameConstraints exclude_under({}, subtrees(under, "evil{}.example.net"));
+         const Botan::NameConstraints exclude_over({}, subtrees(over, "evil{}.example.net"));
+         result.test_is_false("not excluded below the limit", exclude_under.is_excluded(cert, true));
+         result.test_is_true("excluded at the limit", exclude_over.is_excluded(cert, true));
+
+         return {result};
+      }
+};
+
+BOTAN_REGISTER_TEST("x509", "x509_name_constraint_complexity_limit", Name_Constraint_Complexity_Limit_Tests);
 
 #endif
 

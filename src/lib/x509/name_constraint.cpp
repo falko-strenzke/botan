@@ -245,7 +245,8 @@ bool dns_subtree_match(std::string_view name, std::string_view constraint) {
 * RFC 5280 4.2.1.10 RFC822 name constraint matching.
 *
 * The constraint @p c is one of:
-*   - "local@host"    - matches exactly one mailbox (case-insensitive)
+*   - "local@host"    - matches exactly one mailbox (local-part case-sensitive,
+*                       host case-insensitive; RFC 5280 7.5)
 *   - "host"          - matches addresses whose domain is exactly host
 *   - ".host"         - matches addresses in any subdomain of host
 *                       (but NOT the base host itself)
@@ -467,6 +468,26 @@ void GeneralName::encode_into(DER_Encoder& to) const {
 void GeneralName::decode_from(BER_Decoder& ber) {
    const BER_Object obj = ber.get_next_object();
 
+   /*
+   GeneralName is a CHOICE of the context-specific tags [0] through [8].
+   Anything else - no object at all, a universal/application/private class
+   tag, or a tag number outside the CHOICE - is a malformed encoding and is
+   rejected here rather than being retained as an "unknown" name form.
+
+   Forms that are well-formed but not interpreted (x400Address [3],
+   ediPartyName [5], registeredID [8]) are retained as NameType::Unknown so
+   that a critical name constraint using them fails closed.
+   */
+   if(!obj.is_set()) {
+      throw Decoding_Error("GeneralName is missing");
+   }
+
+   const bool context_specific = (obj.class_tag() == ASN1_Class::ContextSpecific) ||
+                                 (obj.class_tag() == ASN1_Class::ExplicitContextSpecific);
+   if(!context_specific || static_cast<uint32_t>(obj.type_tag()) > 8) {
+      throw Decoding_Error("Invalid tag for GeneralName");
+   }
+
    if(obj.is_a(0, ASN1_Class::ExplicitContextSpecific)) {
       m_type = NameType::Other;
    } else if(obj.is_a(1, ASN1_Class::ContextSpecific)) {
@@ -534,8 +555,13 @@ void GeneralName::decode_from(BER_Decoder& ber) {
       } else {
          throw Decoding_Error("Invalid IP name constraint size " + std::to_string(obj.length()));
       }
-   } else {
+   } else if(obj.is_a(3, ASN1_Class::ExplicitContextSpecific) || obj.is_a(5, ASN1_Class::ExplicitContextSpecific) ||
+             obj.is_a(8, ASN1_Class::ContextSpecific)) {
+      // x400Address, ediPartyName, registeredID: valid but not interpreted
       m_type = NameType::Unknown;
+   } else {
+      // A known tag number encoded with the wrong primitive/constructed form
+      throw Decoding_Error("Invalid encoding for GeneralName");
    }
 }
 
