@@ -7,6 +7,13 @@
 
 #include "tests.h"
 
+#include <botan/rng.h>
+#include <botan/internal/loadstor.h>
+
+#if defined(BOTAN_HAS_OS_UTILS)
+   #include <botan/internal/os_utils.h>
+#endif
+
 #include "test_rng.h"
 
 #include <botan/exceptn.h>
@@ -884,6 +891,70 @@ class Processor_RNG_Tests final : public Test {
 BOTAN_REGISTER_TEST("rng", "processor_rng", Processor_RNG_Tests);
 
 #endif
+
+/*
+* Records the additional input that randomize_with_ts_input() forwards to
+* fill_bytes_with_input(), so its length and content can be inspected
+* (regression test for GH #5924).
+*/
+class Recording_RNG final : public Botan::RandomNumberGenerator {
+   public:
+      std::string name() const override { return "Recording_RNG"; }
+
+      bool accepts_input() const override { return true; }
+
+      bool is_seeded() const override { return true; }
+
+      void clear() override { m_last_input.clear(); }
+
+      const std::vector<uint8_t>& last_input() const { return m_last_input; }
+
+   private:
+      void fill_bytes_with_input(std::span<uint8_t> output, std::span<const uint8_t> input) override {
+         m_last_input.assign(input.begin(), input.end());
+         std::fill(output.begin(), output.end(), 0);
+      }
+
+      std::vector<uint8_t> m_last_input;
+};
+
+class RNG_TS_Input_Tests final : public Test {
+   public:
+      std::vector<Test::Result> run() override {
+         Test::Result result("randomize_with_ts_input additional input");
+
+         Recording_RNG rng;
+         std::vector<uint8_t> out(32);
+         rng.randomize_with_ts_input(out);
+         const auto first = rng.last_input();
+         rng.randomize_with_ts_input(out);
+         const auto second = rng.last_input();
+
+#if defined(BOTAN_HAS_SYSTEM_RNG)
+         // 128 bits from the system RNG
+         result.test_sz_eq("additional input length (system RNG)", first.size(), 16);
+         result.test_bin_ne("additional input differs between calls", first, second);
+#elif defined(BOTAN_HAS_OS_UTILS)
+         // 64-bit clock followed by the 32-bit process id, if the platform has one
+         const uint32_t pid = Botan::OS::get_process_id();
+         const size_t expected = (pid != 0) ? 12 : 8;
+         result.test_sz_eq("additional input length (clock + pid)", first.size(), expected);
+         if(first.size() == 12) {
+            result.test_u32_eq("process id is forwarded", Botan::load_le<uint32_t>(first.data() + 8, 0), pid);
+         }
+         if(first.size() >= 8 && second.size() >= 8) {
+            const uint64_t clock1 = Botan::load_le<uint64_t>(first.data(), 0);
+            const uint64_t clock2 = Botan::load_le<uint64_t>(second.data(), 0);
+            result.test_is_true("clock is forwarded in full", clock1 != 0 && clock2 != 0 && clock2 >= clock1);
+         }
+#else
+         result.test_sz_eq("no additional input available", first.size(), 0);
+#endif
+         return {result};
+      }
+};
+
+BOTAN_REGISTER_TEST("rng", "rng_ts_input", RNG_TS_Input_Tests);
 
 }  // namespace
 

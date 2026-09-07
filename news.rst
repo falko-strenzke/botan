@@ -7,6 +7,10 @@ Version 3.14.0, Not Yet Released
 * Add new type ``PK_Signature_Options`` which allows precisely controlling how
   signatures are created and verified. (GH #5849)
 
+* Fix a bug introduced in 3.13.0 where, in builds without the system RNG,
+  ``RandomNumberGenerator::randomize_with_ts_input`` passed only the low 32 bits
+  of the timestamp, and never the process id, as additional input. (GH #5924)
+
 * Password hash tuning (``PasswordHashFamily::tune_params``) now measures the
   CPU time of the calling thread where available (falling back to a monotonic
   clock), and uses the fastest of several samples rather than the mean. This
