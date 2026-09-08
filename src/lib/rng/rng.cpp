@@ -37,8 +37,12 @@ void RandomNumberGenerator::randomize_with_ts_input(std::span<uint8_t> output) {
       const uint32_t pid = OS::get_process_id();  // 0 if no PIDs on this system
 
       store_le(std::span{additional_input}.first<8>(), clock);
-      store_le(std::span{additional_input}.subspan<8, 4>(), pid);
-      const size_t written = 8 + (pid != 0) ? 4 : 0;
+      size_t written = 8;
+
+      if(pid != 0) {
+         store_le(std::span{additional_input}.subspan<8, 4>(), pid);
+         written += 4;
+      }
 #else
       // Nothing to use in this case
       constexpr size_t written = 0;
