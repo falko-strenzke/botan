@@ -414,6 +414,70 @@ Test::Result contains_every_certificate_in_the_store(Botan::Certificate_Store& c
    return result;
 }
 
+Test::Result find_every_certificate_by_issuer_dn_and_serial_number(Botan::Certificate_Store& certstore) {
+   Test::Result result("System Certificate Store - Find every certificate in the store by issuer DN and serial number");
+
+   try {
+      const auto subjects = certstore.all_subjects();
+
+      size_t checked = 0;
+      size_t leading_zero = 0;
+      size_t short_serial = 0;
+      size_t zero_serial = 0;
+
+      result.start_timer();
+      for(const auto& dn : subjects) {
+         for(const auto& cert : certstore.find_all_certs(dn, {})) {
+            // count the serial number encodings this covers
+            const auto contents = cert.serial().der_contents();
+            if(cert.serial().is_zero()) {
+               ++zero_serial;
+            } else if(contents.front() == 0x00) {
+               ++leading_zero;
+            } else if(contents.size() <= 2) {
+               ++short_serial;
+            }
+
+            const auto found =
+               certstore.find_cert_by_issuer_dn_and_serial_number(cert.issuer_dn(), cert.serial_number());
+            if(!found.has_value() || !(*found == cert)) {
+               result.test_failure("certificate not found by issuer DN and serial number: " +
+                                   cert.subject_dn().to_string());
+            }
+            ++checked;
+         }
+      }
+      result.end_timer();
+
+      result.test_sz_gte("checked at least one certificate", checked, 1);
+      result.test_note("checked " + std::to_string(checked) + " certificates (" + std::to_string(leading_zero) +
+                       " with a leading zero octet, " + std::to_string(short_serial) + " short, " +
+                       std::to_string(zero_serial) + " zero serial numbers)");
+   } catch(std::exception& e) {
+      result.test_failure(e.what());
+   }
+
+   return result;
+}
+
+Test::Result find_cert_by_issuer_dn_and_unknown_serial_number(Botan::Certificate_Store& certstore) {
+   Test::Result result("System Certificate Store - Find Certificate by issuer DN and unknown serial number");
+
+   try {
+      auto serial = get_serial_number();
+      serial.back() ^= 0x01;
+
+      std::optional<Botan::X509_Certificate> cert;
+      result.test_no_throw("lookup with an unknown serial number does not throw",
+                           [&] { cert = certstore.find_cert_by_issuer_dn_and_serial_number(get_dn(), serial); });
+      result.test_opt_is_null("no certificate for an unknown serial number", cert);
+   } catch(std::exception& e) {
+      result.test_failure(e.what());
+   }
+
+   return result;
+}
+
    #endif
 
 class Certstor_System_Tests final : public Test {
@@ -456,6 +520,8 @@ class Certstor_System_Tests final : public Test {
          results.push_back(contains_trusted_root_loaded_from_file(*system));
          results.push_back(contains_rejects_untrusted_certificate(*system));
          results.push_back(contains_every_certificate_in_the_store(*system));
+         results.push_back(find_every_certificate_by_issuer_dn_and_serial_number(*system));
+         results.push_back(find_cert_by_issuer_dn_and_unknown_serial_number(*system));
    #endif
 
          return results;

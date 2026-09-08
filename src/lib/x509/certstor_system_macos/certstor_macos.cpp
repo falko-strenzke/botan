@@ -10,6 +10,7 @@
 
 #include <botan/assert.h>
 #include <botan/ber_dec.h>
+#include <botan/bigint.h>
 #include <botan/exceptn.h>
 #include <botan/pkix_types.h>
 #include <botan/internal/x509_cert_cache.h>
@@ -409,23 +410,36 @@ std::optional<X509_Certificate> Certificate_Store_MacOS::find_cert_by_raw_subjec
 
 std::optional<X509_Certificate> Certificate_Store_MacOS::find_cert_by_issuer_dn_and_serial_number(
    const X509_DN& issuer_dn, std::span<const uint8_t> serial_number) const {
-   Certificate_Store_MacOS_Impl::Query query;
    /*
-   Directly using kSecAttrSerialNumber can't find the certificate
-   Maybe macOS has a special encoding for the serial number
-
-   query.addParameter(kSecAttrSerialNumber, serial_number);
+   The keychain stores kSecAttrSerialNumber as the content octets of the DER
+   INTEGER, i.e. with a leading zero octet if the top bit of the magnitude is
+   set and as a single zero octet for serial number zero. The interface passes
+   the unsigned magnitude (as X509_Certificate::serial_number returns it), so
+   it has to be re-encoded before it can be used in the query.
    */
-   query.addParameter(kSecAttrIssuer, normalizeAndSerialize(issuer_dn));
+   const auto serial = X509_Serial_Number::from_bytes(serial_number);
+
+   const auto lookup = [&](const X509_Serial_Number& s) {
+      Certificate_Store_MacOS_Impl::Query query;
+      query.addParameter(kSecAttrIssuer, normalizeAndSerialize(issuer_dn));
+
+      const auto contents = s.der_contents();
+      query.addParameter(kSecAttrSerialNumber, std::vector<uint8_t>(contents.begin(), contents.end()));
+
+      return m_impl->findOne(std::move(query));
+   };
+
+   if(auto cert = lookup(serial)) {
+      return cert;
+   }
 
    /*
-   This is a temporary solution
-   Use only the issuer DN to find all certificates and filters the serial number, but may affect performance
+   The other certificate stores compare the magnitude only, so they also find
+   a (non-conforming) certificate whose serial number is negative. Retry with
+   the negative encoding of the same magnitude to behave the same way.
    */
-   for(const auto& cert : m_impl->findAll(std::move(query))) {
-      if(std::ranges::equal(cert.serial_number(), serial_number)) {
-         return cert;
-      }
+   if(!serial.is_zero()) {
+      return lookup(X509_Serial_Number(-serial.to_bigint()));
    }
 
    return std::nullopt;
