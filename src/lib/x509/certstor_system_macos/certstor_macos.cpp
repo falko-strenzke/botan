@@ -10,9 +10,9 @@
 
 #include <botan/assert.h>
 #include <botan/ber_dec.h>
-#include <botan/data_src.h>
 #include <botan/exceptn.h>
 #include <botan/pkix_types.h>
+#include <botan/internal/x509_cert_cache.h>
 
 #include <algorithm>
 #include <array>
@@ -152,6 +152,10 @@ class Certificate_Store_MacOS_Impl {
       static constexpr const char* system_roots = "/System/Library/Keychains/SystemRootCertificates.keychain";
       static constexpr const char* system_keychain = "/Library/Keychains/System.keychain";
 
+      // Same size as the Windows system certificate store uses; arbitrary but
+      // large enough that repeated lookups of the same roots hit the cache
+      static constexpr size_t SystemStore_CertCacheSize = 128;
+
    public:
       /**
        * Wraps a list of search query parameters that are later passed into
@@ -227,7 +231,8 @@ class Certificate_Store_MacOS_Impl {
             m_policy(SecPolicyCreateBasicX509()),
             m_system_roots(nullptr),
             m_system_chain(nullptr),
-            m_keychains(nullptr) {
+            m_keychains(nullptr),
+            m_cert_cache(SystemStore_CertCacheSize) {
          BOTAN_DIAGNOSTIC_PUSH
          BOTAN_DIAGNOSTIC_IGNORE_DEPRECATED_DECLARATIONS
          // macOS 12.0 deprecates 'Custom keychain management', though the API still works.
@@ -297,6 +302,10 @@ class Certificate_Store_MacOS_Impl {
 
       /**
        * Convert a CFTypeRef object into a X509_Certificate
+       *
+       * The DER encoding is looked up in (or inserted into) the certificate
+       * cache, so repeated hits for the same keychain item share one parsed
+       * certificate instead of being parsed again on every lookup.
        */
       X509_Certificate readCertificate(CFTypeRef object) const {
          if(!object || CFGetTypeID(object) != SecCertificateGetTypeID()) {
@@ -309,10 +318,9 @@ class Certificate_Store_MacOS_Impl {
          check_notnull(derData, "read extracted certificate");
 
          const auto data = CFDataGetBytePtr(derData.get());
-         const auto length = CFDataGetLength(derData.get());
+         const auto length = static_cast<size_t>(CFDataGetLength(derData.get()));
 
-         DataSource_Memory ds(data, length);
-         return X509_Certificate(ds);
+         return m_cert_cache.find_or_insert({data, length});
       }
 
       CFArrayRef keychains() const { return m_keychains.get(); }
@@ -324,6 +332,10 @@ class Certificate_Store_MacOS_Impl {
       scoped_CFType<SecKeychainRef> m_system_roots;
       scoped_CFType<SecKeychainRef> m_system_chain;
       scoped_CFType<CFArrayRef> m_keychains;
+
+      // The cache has its own mutex and is used from const lookup functions;
+      // everything else in this class is immutable after construction.
+      mutable X509_Certificate_Cache m_cert_cache;
 };
 
 //

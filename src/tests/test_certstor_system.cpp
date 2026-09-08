@@ -306,6 +306,34 @@ Test::Result certificate_matching_with_dn_normalization(Botan::Certificate_Store
    return result;
 }
 
+Test::Result repeated_lookups_share_parsed_certificate(Botan::Certificate_Store& certstore) {
+   Test::Result result("System Certificate Store - repeated lookups share the parsed certificate");
+
+   try {
+      const auto dn = get_dn();
+
+      result.start_timer();
+      const auto first = certstore.find_cert(dn, {});
+      const auto second = certstore.find_cert(dn, {});
+      result.end_timer();
+
+      if(result.test_opt_not_null("first lookup found the certificate", first) &&
+         result.test_opt_not_null("second lookup found the certificate", second)) {
+         result.test_is_true("both lookups return the same certificate", *first == *second);
+
+         // certificate_data_sha256() returns a view into the parsed certificate
+         // data. Equal pointers prove that the two objects share it, i.e. the
+         // second lookup was served from the cache instead of parsing again.
+         result.test_is_true("parsed certificate data is shared between the lookups",
+                             first->certificate_data_sha256().data() == second->certificate_data_sha256().data());
+      }
+   } catch(std::exception& e) {
+      result.test_failure(e.what());
+   }
+
+   return result;
+}
+
    #endif
 
 class Certstor_System_Tests final : public Test {
@@ -344,6 +372,7 @@ class Certstor_System_Tests final : public Test {
          results.push_back(find_cert_by_issuer_dn_and_serial_number(*system));
    #if defined(BOTAN_HAS_CERTSTOR_MACOS)
          results.push_back(certificate_matching_with_dn_normalization(*system));
+         results.push_back(repeated_lookups_share_parsed_certificate(*system));
    #endif
 
          return results;
