@@ -75,6 +75,13 @@ class BOTAN_PUBLIC_API(2, 10) Certificate_Store_MacOS final : public Certificate
        */
       std::optional<X509_CRL> find_crl_for(const X509_Certificate& subject) const override;
 
+      /**
+       * Check whether the system trust store contains this exact certificate.
+       * Looks up the certificates with the same public key in the keychain and
+       * compares their encoding, instead of the generic subject DN lookup.
+       */
+      bool contains(const X509_Certificate& cert) const override;
+
    private:
       std::shared_ptr<Certificate_Store_MacOS_Impl> m_impl;
 };

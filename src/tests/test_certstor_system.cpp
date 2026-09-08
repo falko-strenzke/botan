@@ -334,6 +334,86 @@ Test::Result repeated_lookups_share_parsed_certificate(Botan::Certificate_Store&
    return result;
 }
 
+Test::Result contains_trusted_root_loaded_from_file(Botan::Certificate_Store& certstore) {
+   Test::Result result("System Certificate Store - contains() for a trusted root loaded from a file");
+
+   try {
+      // ISRG Root X1 is the first certificate in this bundle. Loading it from
+      // a file (rather than from the keychain) exercises the encoding that the
+      // lookup hands to the keychain.
+      const Botan::X509_Certificate root(Test::data_file("x509/misc/certstor/ca_bundle_containing_non_ca.pem"));
+
+      if(result.test_str_eq(
+            "fixture is the expected root", root.subject_dn().get_first_attribute("CN"), get_subject_cn())) {
+         result.start_timer();
+         const bool contained = certstore.contains(root);
+         result.end_timer();
+
+         result.test_is_true("root loaded from file is contained", contained);
+      }
+   } catch(std::exception& e) {
+      result.test_failure(e.what());
+   }
+
+   return result;
+}
+
+Test::Result contains_rejects_untrusted_certificate(Botan::Certificate_Store& certstore) {
+   Test::Result result("System Certificate Store - contains() for a certificate that is not in the store");
+
+   try {
+      // self-signed test root of the x509test suite, certainly not in any
+      // system keychain
+      const Botan::X509_Certificate unknown(Test::data_file("x509/x509test/root.pem"));
+
+      bool contained = true;
+      result.test_no_throw("contains() does not throw for an unknown certificate",
+                           [&] { contained = certstore.contains(unknown); });
+      result.test_is_false("unknown certificate is not contained", contained);
+   } catch(std::exception& e) {
+      result.test_failure(e.what());
+   }
+
+   return result;
+}
+
+Test::Result contains_every_certificate_in_the_store(Botan::Certificate_Store& certstore) {
+   Test::Result result("System Certificate Store - contains() for every certificate in the store");
+
+   try {
+      const auto subjects = certstore.all_subjects();
+
+      size_t checked = 0;
+      size_t not_found = 0;
+
+      result.start_timer();
+      for(const auto& dn : subjects) {
+         const auto certs = certstore.find_all_certs(dn, {});
+         if(certs.empty()) {
+            // subject DN could not be looked up again (DN normalization
+            // issue unrelated to contains()); just note it
+            ++not_found;
+         }
+
+         for(const auto& cert : certs) {
+            if(!certstore.contains(cert)) {
+               result.test_failure("certificate is not considered contained: " + cert.subject_dn().to_string());
+            }
+            ++checked;
+         }
+      }
+      result.end_timer();
+
+      result.test_sz_gte("checked at least one certificate", checked, 1);
+      result.test_note("checked " + std::to_string(checked) + " certificates, " + std::to_string(not_found) +
+                       " subjects could not be looked up again");
+   } catch(std::exception& e) {
+      result.test_failure(e.what());
+   }
+
+   return result;
+}
+
    #endif
 
 class Certstor_System_Tests final : public Test {
@@ -373,6 +453,9 @@ class Certstor_System_Tests final : public Test {
    #if defined(BOTAN_HAS_CERTSTOR_MACOS)
          results.push_back(certificate_matching_with_dn_normalization(*system));
          results.push_back(repeated_lookups_share_parsed_certificate(*system));
+         results.push_back(contains_trusted_root_loaded_from_file(*system));
+         results.push_back(contains_rejects_untrusted_certificate(*system));
+         results.push_back(contains_every_certificate_in_the_store(*system));
    #endif
 
          return results;

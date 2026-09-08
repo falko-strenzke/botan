@@ -436,4 +436,27 @@ std::optional<X509_CRL> Certificate_Store_MacOS::find_crl_for(const X509_Certifi
    return {};
 }
 
+bool Certificate_Store_MacOS::contains(const X509_Certificate& cert) const {
+   /*
+   The keychain cannot be searched by a hash of the whole certificate (unlike
+   CERT_FIND_SHA1_HASH on Windows). The most selective attribute the keychain
+   indexes is the SHA-1 hash of the public key, which is derived from the key
+   itself (see GH #2779) and shared only between certificates for the same
+   key, e.g. cross-signed variants of a root. Fetch those candidates and
+   compare their full encoding, so that, as in the generic implementation,
+   only a binary identical certificate counts.
+   */
+   Certificate_Store_MacOS_Impl::Query query;
+   query.addParameter(kSecAttrPublicKeyHash, cert.subject_public_key_bitstring_sha1());
+
+   const auto sha256 = cert.certificate_data_sha256();
+   for(const auto& candidate : m_impl->findAll(std::move(query))) {
+      if(std::ranges::equal(candidate.certificate_data_sha256(), sha256)) {
+         return true;
+      }
+   }
+
+   return false;
+}
+
 }  // namespace Botan
