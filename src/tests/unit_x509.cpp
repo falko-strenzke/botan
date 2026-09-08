@@ -21,6 +21,7 @@
    #include <botan/x509path.h>
    #include <botan/x509self.h>
    #include <botan/internal/calendar.h>
+   #include <botan/internal/x509_cert_cache.h>
    #include <algorithm>
 
    #if defined(BOTAN_HAS_ECC_GROUP)
@@ -2322,6 +2323,75 @@ class X509_Cert_Unit_Tests final : public Test {
 };
 
 BOTAN_REGISTER_TEST("x509", "x509_unit", X509_Cert_Unit_Tests);
+
+class X509_Cert_Cache_Tests final : public Test {
+   public:
+      std::vector<Test::Result> run() override {
+         Test::Result result("X509_Certificate_Cache");
+
+         auto rng = Test::new_rng(__func__);
+         auto key = Botan::create_private_key("ECDSA", *rng, "secp256r1");
+         if(!key) {
+            result.note_missing("ECDSA/secp256r1");
+            return {result};
+         }
+
+         // Distinct certificates (same key, different subjects)
+         const size_t cache_size = 32;
+         const size_t count = cache_size + 16;
+         std::vector<std::vector<uint8_t>> encodings;
+         for(size_t i = 0; i < count; ++i) {
+            const Botan::X509_Cert_Options opts("Cache Test " + std::to_string(i) + "/US");
+            encodings.push_back(Botan::X509::create_self_signed_cert(opts, *key, "SHA-256", *rng).BER_encode());
+         }
+
+         Botan::X509_Certificate_Cache cache(cache_size);
+
+         // A repeated lookup is served from the cache, i.e. shares the parsed data
+         {
+            const auto first = cache.find_or_insert(encodings[0]);
+            const auto second = cache.find_or_insert(encodings[0]);
+            result.test_is_true("repeated lookup shares the parsed certificate",
+                                first.certificate_data_sha256().data() == second.certificate_data_sha256().data());
+         }
+
+         // Fill the cache to capacity ...
+         for(size_t i = 0; i < cache_size; ++i) {
+            cache.find_or_insert(encodings[i]);
+         }
+
+         // ... then look up pairs of further certificates alternately. Every
+         // miss evicts an entry; the eviction must not systematically pick the
+         // entry inserted last, otherwise two certificates that are looked up
+         // alternately evict each other on every single lookup.
+         const size_t rounds = 50;
+         size_t misses = 0;
+         size_t lookups = 0;
+         for(size_t p = cache_size; p + 1 < count; p += 2) {
+            auto a = cache.find_or_insert(encodings[p]);
+            auto b = cache.find_or_insert(encodings[p + 1]);
+            for(size_t r = 0; r < rounds; ++r) {
+               const auto a2 = cache.find_or_insert(encodings[p]);
+               if(a2.certificate_data_sha256().data() != a.certificate_data_sha256().data()) {
+                  ++misses;
+                  a = a2;
+               }
+               const auto b2 = cache.find_or_insert(encodings[p + 1]);
+               if(b2.certificate_data_sha256().data() != b.certificate_data_sha256().data()) {
+                  ++misses;
+                  b = b2;
+               }
+               lookups += 2;
+            }
+         }
+         result.test_note("misses after overflow: " + std::to_string(misses) + " of " + std::to_string(lookups));
+         result.test_sz_lt("alternating lookups after overflow mostly hit the cache", misses, lookups / 4);
+
+         return {result};
+      }
+};
+
+BOTAN_REGISTER_TEST("x509", "x509_cert_cache", X509_Cert_Cache_Tests);
 
 #endif
 

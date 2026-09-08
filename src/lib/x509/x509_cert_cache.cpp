@@ -7,6 +7,7 @@
 #include <botan/internal/x509_cert_cache.h>
 
 #include <botan/hash.h>
+#include <iterator>
 
 namespace Botan {
 
@@ -44,9 +45,18 @@ X509_Certificate X509_Certificate_Cache::find_or_insert(std::span<const uint8_t>
 
    // Evict if required
    //
-   // Effectively this is just a random drop, might make sense to add LRU here
-   while(m_cache.size() >= m_max_entries) {
-      m_cache.erase(m_cache.begin());
+   // Drop a pseudo-random entry, chosen by the hash of the new one. Erasing
+   // begin() is not a random drop: the standard library implementations
+   // insert a node whose bucket was empty at the front of the list, so that
+   // would often evict the entry inserted immediately before, and two
+   // certificates that are looked up alternately could evict each other on
+   // every lookup.
+   //
+   // Might make sense to add LRU here
+   if(m_cache.size() >= m_max_entries) {
+      auto victim = m_cache.begin();
+      std::advance(victim, hash.hash() % m_cache.size());
+      m_cache.erase(victim);
    }
 
    // Add the newly deserialized cert to the cache
