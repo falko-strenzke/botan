@@ -437,6 +437,8 @@ std::optional<X509_Certificate> Certificate_Store_MacOS::find_cert_by_issuer_dn_
    The other certificate stores compare the magnitude only, so they also find
    a (non-conforming) certificate whose serial number is negative. Retry with
    the negative encoding of the same magnitude to behave the same way.
+
+   TODO(Botan4) remove this behavior when negative serial number support is dropped
    */
    if(!serial.is_zero()) {
       return lookup(X509_Serial_Number(-serial.to_bigint()));
