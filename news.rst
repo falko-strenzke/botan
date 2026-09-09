@@ -54,6 +54,12 @@ Version 3.14.0, Not Yet Released
 * CI updates including moving most builds to Ubuntu 26.04, adding Windows Aarch64
   builders, and updating dependencies used in CI (GH #5846 #5848 #5860 #5861)
 
+* Add a certificate cache to the macOS system certificate store, implement
+  ``contains()`` directly, and query the keychain by issuer DN and serial
+  number instead of scanning all certificates of an issuer. Fix the
+  eviction order of the certificate cache shared with the Windows store.
+  (GH #5541)
+
 Version 3.13.0, 2026-08-13
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

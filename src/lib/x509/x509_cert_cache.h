@@ -27,7 +27,7 @@ class HashFunction;
 * be parsed each time. The cache deduplicates these by keying on the
 * SHA-256 hash of the DER encoding.
 */
-class X509_Certificate_Cache final {
+class BOTAN_TEST_API X509_Certificate_Cache final {
    public:
       /**
       * @param max_entries maximum number of certificates to cache.
