@@ -4,6 +4,19 @@ Release Notes
 Version 3.13.0, Not Yet Released
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+* Fix the ML-DSA private key encoding in PKCS #8 containers to conform to
+  RFC 9881. All three encodings of the RFC (seed, expanded key, both) are
+  supported; a key loaded from one of them is re-encoded in the same format,
+  newly generated keys are encoded in the "both" format. Previously the raw
+  32-byte seed was written, which is still accepted when loading a key.
+  Add the interface ``Module_Lattice_PrivateKey`` (``botan/module_lattice_keys.h``)
+  implemented by ``ML_DSA_PrivateKey`` and ``ML_KEM_PrivateKey`` to query the
+  private key format and to encode a key in a specific format; the enum
+  ``MlPrivateKeyFormat`` moved to that header and gained the value ``Both``.
+  ``Kyber_PrivateKey::private_key_bits_with_format`` is deprecated in favor of
+  ``formatted_raw_private_key_bits``. The internal module ``pqcrystals`` was
+  renamed to ``module_lattice``. (GH #5002 #5307)
+
 * Add URI and email name constraint processing to X509 path validation (GH #5598)
 
 * Add ``DNSName``, ``URI``, and ``EmailAddress`` types. (GH #5598 #5601 #5622 #5663
