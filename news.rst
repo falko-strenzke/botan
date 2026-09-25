@@ -4,6 +4,11 @@ Release Notes
 Version 3.14.0, Not Yet Released
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+* Add an opt-in module ``hqc`` implementing the HQC key encapsulation
+  mechanism (parameter sets HQC-1, HQC-3, HQC-5). The cryptographic core is
+  the Rust crate rust-hqc, linked as a static library via its C API; the
+  module is not built by default and requires a Rust toolchain.
+
 * Add types ``PK_Signature_Options`` ``PK_Encryption_Options``, ``PK_KEM_Options``,
   and ``PK_Key_Agreement_Options`` which allow an application to precisely control
   how public key operations (signature, encryption, decryption, KEM, etc) are
