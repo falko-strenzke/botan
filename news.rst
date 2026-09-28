@@ -5,7 +5,8 @@ Version 3.14.0, Not Yet Released
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Add an opt-in module ``hqc`` implementing the HQC key encapsulation
-  mechanism (parameter sets HQC-1, HQC-3, HQC-5). The cryptographic core is
+  mechanism of the round-4 submission as ``HQCr4`` (parameter sets HQCr4-1,
+  HQCr4-3, HQCr4-5). The cryptographic core is
   the Rust crate rust-hqc, linked as a static library via its C API; the
   module is not built by default and requires a Rust toolchain.
 
